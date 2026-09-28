@@ -23,7 +23,8 @@ import {
     IconLockCheck,
     IconFileDatabase,
     IconShieldLock,
-    IconListCheck
+    IconListCheck,
+    IconMessageChatbot
 } from '@tabler/icons-react'
 
 // constant
@@ -51,7 +52,8 @@ const icons = {
     IconLockCheck,
     IconFileDatabase,
     IconShieldLock,
-    IconListCheck
+    IconListCheck,
+    IconMessageChatbot
 }
 
 // ==============================|| DASHBOARD MENU ITEMS ||============================== //
@@ -66,6 +68,14 @@ const dashboard = {
             title: '',
             type: 'group',
             children: [
+                {
+                    id: 'chatbot',
+                    title: 'ChatBot',
+                    type: 'item',
+                    url: '/vibeflow-chatbot',
+                    icon: icons.IconMessageChatbot,
+                    breadcrumbs: true
+                },
                 {
                     id: 'chatflows',
                     title: 'Chatflows',

@@ -158,6 +158,24 @@ const getExecutions = async (req: Request, res: Response, next: NextFunction) =>
     }
 }
 
+const getMonitoring = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sessionId = typeof req.query?.sessionId === 'string' ? req.query.sessionId : undefined
+        return res.json(await vibeflowChatBotService.getMonitoring(sessionId))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const postExecution = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const id = requireParam(req.params?.id, 'Error: vibeflowChatBotController.postExecution - id not provided!')
+        return res.json(await vibeflowChatBotService.postExecution(id, req.body))
+    } catch (error) {
+        next(error)
+    }
+}
+
 // -------------------------------- execution -------------------------------
 
 const executeWorkflow = async (req: Request, res: Response, next: NextFunction) => {
@@ -190,11 +208,13 @@ export default {
     getContext,
     getExecutions,
     getMessages,
+    getMonitoring,
     getSessionById,
     getSessions,
     getStats,
     getWorkflows,
     getWorkspaces,
+    postExecution,
     postMessage,
     postSession,
     postWorkspace,

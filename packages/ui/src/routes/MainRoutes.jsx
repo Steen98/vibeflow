@@ -13,6 +13,9 @@ const Chatflows = Loadable(lazy(() => import('@/views/chatflows')))
 // agents routing
 const Agentflows = Loadable(lazy(() => import('@/views/agentflows')))
 
+// vibeflow chatbot routing (execution layer, not a workflow editor)
+const VibeFlowChatBot = Loadable(lazy(() => import('@/views/vibeflow-chatbot')))
+
 // marketplaces routing
 const Marketplaces = Loadable(lazy(() => import('@/views/marketplaces')))
 
@@ -93,6 +96,14 @@ const MainRoutes = {
             element: (
                 <RequireAuth permission={'agentflows:view'}>
                     <Agentflows />
+                </RequireAuth>
+            )
+        },
+        {
+            path: '/vibeflow-chatbot',
+            element: (
+                <RequireAuth>
+                    <VibeFlowChatBot />
                 </RequireAuth>
             )
         },

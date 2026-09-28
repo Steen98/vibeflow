@@ -5,6 +5,7 @@ const router = express.Router()
 
 // VibeFlow ChatBot: conversational execution layer for the existing workflows
 router.get('/stats', vibeflowChatBotController.getStats)
+router.get('/monitoring', vibeflowChatBotController.getMonitoring)
 
 // Workspaces (working directories on the host machine)
 router.get('/workspaces', vibeflowChatBotController.getWorkspaces)
@@ -30,6 +31,7 @@ router.get('/sessions/:id/context', vibeflowChatBotController.getContext)
 
 // Execution
 router.get('/sessions/:id/executions', vibeflowChatBotController.getExecutions)
+router.post('/sessions/:id/executions', vibeflowChatBotController.postExecution)
 router.post('/sessions/:id/execute', vibeflowChatBotController.executeWorkflow)
 router.post('/sessions/:id/executions/:executionId/stop', vibeflowChatBotController.stopExecution)
 

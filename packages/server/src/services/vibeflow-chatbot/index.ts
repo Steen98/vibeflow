@@ -27,6 +27,7 @@ import { getErrorMessage } from '../../errors/utils'
 import { MODE } from '../../Interface'
 import { utilBuildChatflow } from '../../utils/buildChatflow'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
+import { collectMonitoring } from './monitoring'
 
 /**
  * VibeFlow ChatBot service.
@@ -214,6 +215,42 @@ const getExecutions = async (id: string) => {
     }
 }
 
+/**
+ * Pre-create an execution so the UI knows its id before the run completes: this is what makes
+ * the "Stop" action usable while a prediction is still in flight.
+ */
+const postExecution = async (sessionId: string, body: { workflowId?: string; messageId?: string; usedContextMessages?: number }) => {
+    try {
+        const session = getSession(sessionId)
+        if (!session) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+        const workflowId = body?.workflowId || session.defaultWorkflowId
+        if (!workflowId) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'No workflow selected for this session')
+        return {
+            data: createExecution(sessionId, {
+                workflowId,
+                messageId: body?.messageId,
+                usedContextMessages: body?.usedContextMessages,
+                cancellationSupported: isQueueMode()
+            })
+        }
+    } catch (error) {
+        throw toInternalError(error, 'postExecution', StatusCodes.BAD_REQUEST)
+    }
+}
+
+/**
+ * AI monitoring: CPU / RAM / GPU usage, provider balance (capability detected) and
+ * the conversation context usage of a session. Unavailable metrics are reported as
+ * unavailable together with the reason.
+ */
+const getMonitoring = async (sessionId?: string) => {
+    try {
+        return { data: await collectMonitoring(sessionId) }
+    } catch (error) {
+        throw toInternalError(error, 'getMonitoring')
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Execution (delegated to the real Flowise prediction pipeline)
 // ---------------------------------------------------------------------------
@@ -224,6 +261,7 @@ const executeWorkflow = async (
     body: {
         question?: string
         workflowId?: string
+        executionId?: string
         attachments?: any[]
         transcription?: any
         overrideConfig?: any
@@ -259,14 +297,29 @@ const executeWorkflow = async (
         metadata: { workflowId, contextMessages: contextMessages.length }
     })
 
-    const execution = createExecution(sessionId, {
-        workflowId,
+    // The UI may pre-create the execution (POST /sessions/:id/executions) so that "Stop" works
+    // while the prediction is still running. Otherwise the execution is created here.
+    const providedExecutionId = (body as any)?.executionId as string | undefined
+    const preCreatedExecution = providedExecutionId ? getExecution(sessionId, providedExecutionId) : undefined
+    if (providedExecutionId && !preCreatedExecution) {
+        throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Execution ${providedExecutionId} not found`)
+    }
+
+    const execution =
+        preCreatedExecution ||
+        createExecution(sessionId, {
+            workflowId,
+            messageId: userMessage.id,
+            cancellationSupported: isQueueMode(),
+            usedContextMessages: contextMessages.length
+        })
+    updateExecution(sessionId, execution.id, {
+        status: 'RUNNING',
+        startTime: new Date().toISOString(),
         messageId: userMessage.id,
-        cancellationSupported: isQueueMode(),
+        workflowId,
         usedContextMessages: contextMessages.length
     })
-    updateExecution(sessionId, execution.id, { status: 'RUNNING', startTime: new Date().toISOString() })
-
     const contextualQuestion = contextMessages.length
         ? `${contextMessages
               .map((message) => `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`)
@@ -370,11 +423,13 @@ export default {
     getContext,
     getExecutions,
     getMessages,
+    getMonitoring,
     getSessionById,
     getSessions,
     getStats,
     getWorkflows,
     getWorkspaces,
+    postExecution,
     postMessage,
     postSession,
     postWorkspace,
