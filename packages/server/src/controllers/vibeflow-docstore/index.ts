@@ -152,15 +152,48 @@ const getPipelinePaths = async (req: Request, res: Response, next: NextFunction)
     }
 }
 
+const getEnrichedTable = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = req.user?.activeWorkspaceId
+        if (!workspaceId) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, 'Active workspace not found')
+        return res.json(await vibeflowDocStoreService.getEnrichedTable(workspaceId))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const syncStoreGraph = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const storeId = requireParam(req.params?.storeId, 'Error: vibeflowDocStoreController.syncStoreGraph - storeId not provided!')
+        const workspaceId = req.user?.activeWorkspaceId
+        if (!workspaceId) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, 'Active workspace not found')
+        return res.json(await vibeflowDocStoreService.syncStoreGraph({ storeId, workspaceId, engine: req.body?.engine }))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const savePipelineOptions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const storeId = requireParam(req.params?.storeId, 'Error: vibeflowDocStoreController.savePipelineOptions - storeId not provided!')
+        return res.json(await vibeflowDocStoreService.saveStorePipelineOptions(storeId, req.body || {}))
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     cancelPipelineJob,
+    getEnrichedTable,
     getGraphEngines,
     getPipelineJob,
     getPipelinePaths,
     getStoreGraph,
     listPipelineJobs,
     previewPipeline,
+    savePipelineOptions,
     searchStoreGraph,
     startPipelineJob,
+    syncStoreGraph,
     traverseStoreGraph
 }

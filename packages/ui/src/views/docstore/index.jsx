@@ -16,6 +16,8 @@ import MainCard from '@/ui-component/cards/MainCard'
 import TablePagination, { DEFAULT_ITEMS_PER_PAGE } from '@/ui-component/pagination/TablePagination'
 import AddDocStoreDialog from '@/views/docstore/AddDocStoreDialog'
 import DeleteDocStoreDialog from '@/views/docstore/DeleteDocStoreDialog'
+import KnowledgeGraphView from '@/views/docstore/KnowledgeGraphView'
+import vibeflowDocStoreApi from '@/api/vibeflowDocStore'
 
 // API
 import documentsApi from '@/api/documentstore'
@@ -69,6 +71,8 @@ const Documents = () => {
     const [selectedDocumentStore, setSelectedDocumentStore] = useState(null)
     const [showDeleteDocStoreDialog, setShowDeleteDocStoreDialog] = useState(false)
     const [deleteDocStoreDialogProps, setDeleteDocStoreDialogProps] = useState({})
+    const [docStoreEnrichment, setDocStoreEnrichment] = useState({})
+    const [graphViewer, setGraphViewer] = useState({ show: false, storeId: '', engine: 'graphology-local' })
 
     const canRenameDocumentStore = hasPermission('documentStores:create,documentStores:update')
     const canDeleteDocumentStore = hasPermission('documentStores:delete')
@@ -85,6 +89,82 @@ const Documents = () => {
         return (
             data.name.toLowerCase().indexOf(search.toLowerCase()) > -1 || data.description.toLowerCase().indexOf(search.toLowerCase()) > -1
         )
+    }
+
+    // VibeFlow: enriched table data (loader, summary, splitter, sources, chunks, characters, graph)
+    const loadEnrichment = async () => {
+        try {
+            const response = await vibeflowDocStoreApi.getEnrichedTable()
+            const rows = response.data?.data || []
+            const map = {}
+            for (const row of rows) map[row.id] = row
+            setDocStoreEnrichment(map)
+        } catch {
+            setDocStoreEnrichment({})
+        }
+    }
+
+    useEffect(() => {
+        loadEnrichment()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const notify = (message, variant) =>
+        enqueueSnackbar({
+            message,
+            options: { key: new Date().getTime() + Math.random(), variant }
+        })
+
+    const handleGraphAction = async (action, row) => {
+        const info = docStoreEnrichment[row.id]
+
+        if (action === 'view') {
+            setGraphViewer({ show: true, storeId: row.id, engine: info?.graph?.engine || 'graphology-local' })
+            return
+        }
+
+        if (action === 'stats') {
+            notify(
+                info
+                    ? `${row.name}: ${info.sources} source(s), ${info.chunks} chunk(s), ${info.characters} caractères · graphe ${
+                          info.graph?.engine
+                      }: ${info.graph?.nodes || 0} nœuds / ${info.graph?.relations || 0} relations`
+                    : `${row.name}: aucune donnée enrichie disponible`,
+                'info'
+            )
+            return
+        }
+
+        if (action === 'sync') {
+            try {
+                const response = await vibeflowDocStoreApi.syncStoreGraph(row.id, { engine: info?.graph?.engine })
+                const data = response.data?.data
+                notify(
+                    `Knowledge graph synchronisé depuis les chunks stockés: ${data?.documents || 0} document(s), ${
+                        data?.statistics?.nodes || 0
+                    } nœuds / ${data?.statistics?.relations || 0} relations`,
+                    'success'
+                )
+                await loadEnrichment()
+            } catch (requestError) {
+                notify(requestError?.response?.data?.message || 'Synchronisation du graphe impossible', 'error')
+            }
+            return
+        }
+
+        if (action === 'reindex') {
+            try {
+                const response = await vibeflowDocStoreApi.startPipelineJob(row.id, {})
+                notify(`Réindexation lancée (job ${response.data?.data?.id || ''})`, 'success')
+                await loadEnrichment()
+            } catch (requestError) {
+                notify(
+                    requestError?.response?.data?.message ||
+                        'Réindexation impossible: configurez d abord « Advanced Document Processing » sur ce Document Store',
+                    'warning'
+                )
+            }
+        }
     }
 
     const onSearchChange = (event) => {
@@ -444,6 +524,8 @@ const Documents = () => {
                                     showActions={canManageDocumentStore}
                                     onActionMenuClick={handleActionMenuOpen}
                                     actionButtonSx={getDocStoreActionButtonSx(theme)}
+                                    enrichment={docStoreEnrichment}
+                                    onGraphAction={handleGraphAction}
                                 />
                             )}
                             {/* Pagination and Page Size Controls */}
@@ -460,6 +542,12 @@ const Documents = () => {
                     onConfirm={onConfirm}
                 />
             )}
+            <KnowledgeGraphView
+                show={graphViewer.show}
+                documentStoreId={graphViewer.storeId}
+                engine={graphViewer.engine}
+                onCancel={() => setGraphViewer({ show: false, storeId: '', engine: 'graphology-local' })}
+            />
             {showDeleteDocStoreDialog && (
                 <DeleteDocStoreDialog
                     show={showDeleteDocStoreDialog}

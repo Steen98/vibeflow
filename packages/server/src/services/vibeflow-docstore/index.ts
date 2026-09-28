@@ -711,16 +711,218 @@ export const getStoreGraphPaths = async (storeId: string) => {
     return { data: { temporaryBackupDirectory: getDocumentStoreTmpDir(storeId) } }
 }
 
+// ---------------------------------------------------------------------------
+// Enriched Document Store table (M6 - paragraph 15) and graph synchronization
+// ---------------------------------------------------------------------------
+
+const getPipelineOptionsPath = (storeId: string): string => {
+    const root = getDocumentStoreTmpDir(storeId)
+    const dir = require('path').join(root, '..', 'vibeflow-pipeline-options')
+    return require('path').join(dir, `${String(storeId).replace(/[^a-zA-Z0-9._-]/g, '_')}.json`)
+}
+
+export interface IStorePipelineOptions {
+    documentStoreId: string
+    loaderId?: string
+    fractionator?: { maxPagesPerSegment?: number; detectSemanticBoundaries?: boolean }
+    summary?: { enabled: boolean; name?: string; label?: string; credentialId?: string; config?: Record<string, unknown> }
+    graph?: { enabled: boolean; engine?: GraphEngine }
+    updatedAt: string
+}
+
+export const saveStorePipelineOptions = async (storeId: string, options: Partial<IStorePipelineOptions>) => {
+    try {
+        const fs = require('fs')
+        const filePath = getPipelineOptionsPath(storeId)
+        fs.mkdirSync(require('path').dirname(filePath), { recursive: true })
+        const payload: IStorePipelineOptions = {
+            documentStoreId: storeId,
+            loaderId: options.loaderId,
+            fractionator: options.fractionator,
+            summary: options.summary,
+            graph: options.graph,
+            updatedAt: new Date().toISOString()
+        }
+        fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8')
+        return { data: payload }
+    } catch (error) {
+        throw new InternalFlowiseError(500, `Error: vibeflowDocStoreService.saveStorePipelineOptions - ${getErrorMessage(error)}`)
+    }
+}
+
+export const getStorePipelineOptions = (storeId: string): IStorePipelineOptions | null => {
+    try {
+        const fs = require('fs')
+        const filePath = getPipelineOptionsPath(storeId)
+        if (!fs.existsSync(filePath)) return null
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as IStorePipelineOptions
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Rebuild the knowledge graph of a Document Store from the chunks that are already stored:
+ * the vector side is not touched, the graph side is regenerated from the real data.
+ */
+export const syncStoreGraph = async (params: { storeId: string; workspaceId: string; engine?: GraphEngine }) => {
+    try {
+        const appServer = getRunningExpressApp()
+        const { DocumentStoreFileChunk } = require('../../database/entities/DocumentStoreFileChunk')
+        const chunks = await appServer.AppDataSource.getRepository(DocumentStoreFileChunk).find({
+            where: { storeId: params.storeId },
+            take: 10000
+        })
+
+        const adapter = await resolveGraphAdapter({
+            engine: params.engine || 'graphology-local',
+            documentStoreId: params.storeId
+        })
+        await adapter.createGraph()
+
+        const byDocument = new Map<string, { sourceId: string; version: string; segments: Map<string, any> }>()
+        for (const chunk of chunks) {
+            let metadata: Record<string, any> = {}
+            try {
+                metadata = chunk.metadata ? JSON.parse(chunk.metadata) : {}
+            } catch {
+                metadata = {}
+            }
+            const documentId = metadata.documentId || chunk.docId || 'document'
+            const segmentId = metadata.segmentId || `chunk-${chunk.chunkNo}`
+            if (!byDocument.has(documentId)) {
+                byDocument.set(documentId, {
+                    sourceId: metadata.sourceId || documentId,
+                    version: metadata.version || '1',
+                    segments: new Map()
+                })
+            }
+            const document = byDocument.get(documentId) as any
+            if (!document.segments.has(segmentId)) {
+                document.segments.set(segmentId, {
+                    segmentId,
+                    index: document.segments.size + 1,
+                    startPage: metadata.startPage,
+                    endPage: metadata.endPage,
+                    title: metadata.title,
+                    chunkIds: []
+                })
+            }
+            document.segments.get(segmentId).chunkIds.push(String(metadata.chunkId || `${chunk.docId}:${chunk.chunkNo}`))
+        }
+
+        let documents = 0
+        for (const [documentId, document] of byDocument.entries()) {
+            const structural = buildStructuralKnowledgeGraph({
+                documentId,
+                sourceId: document.sourceId,
+                version: document.version,
+                segments: [...document.segments.values()]
+            })
+            await adapter.updateDocument(documentId, structural.entities, structural.relations)
+            documents += 1
+        }
+
+        const statistics = await adapter.getStatistics()
+        return { data: { documents, chunks: chunks.length, statistics } }
+    } catch (error) {
+        throw new InternalFlowiseError(500, `Error: vibeflowDocStoreService.syncStoreGraph - ${getErrorMessage(error)}`)
+    }
+}
+
+/** One row per Document Store, with everything the enriched table needs. */
+export const getEnrichedTable = async (workspaceId: string) => {
+    try {
+        const appServer = getRunningExpressApp()
+        const stores = await appServer.AppDataSource.getRepository(DocumentStore).findBy({ workspaceId })
+        const { DocumentStoreFileChunk } = require('../../database/entities/DocumentStoreFileChunk')
+
+        const rows = []
+        for (const store of stores) {
+            let loaders: any[] = []
+            try {
+                loaders = JSON.parse(store.loaders || '[]')
+            } catch {
+                loaders = []
+            }
+
+            const chunkRows = await appServer.AppDataSource.getRepository(DocumentStoreFileChunk).find({
+                where: { storeId: store.id },
+                select: ['chunkNo', 'pageContent']
+            })
+            const chunks = chunkRows.length
+            const characters =
+                chunkRows.reduce((total, chunk) => total + (chunk.pageContent ? chunk.pageContent.length : 0), 0) ||
+                loaders.reduce((total, loader) => total + (loader.totalChars || 0), 0)
+
+            const options = getStorePipelineOptions(store.id)
+            let graph: { engine: string; available: boolean; nodes: number; relations: number; reason?: string } = {
+                engine: options?.graph?.engine || 'graphology-local',
+                available: false,
+                nodes: 0,
+                relations: 0
+            }
+            try {
+                const adapter = await resolveGraphAdapter({
+                    engine: (options?.graph?.engine as GraphEngine) || 'graphology-local',
+                    documentStoreId: store.id
+                })
+                const status = await adapter.isAvailable()
+                if (status.available) {
+                    const statistics = await adapter.getStatistics()
+                    graph = {
+                        engine: statistics.engine,
+                        available: statistics.nodes > 0,
+                        nodes: statistics.nodes,
+                        relations: statistics.relations
+                    }
+                } else {
+                    graph = { ...graph, available: false, reason: status.reason }
+                }
+            } catch (error) {
+                graph = { ...graph, available: false, reason: getErrorMessage(error) }
+            }
+
+            rows.push({
+                id: store.id,
+                name: store.name,
+                loaders: [...new Set(loaders.map((loader) => loader.loaderName || loader.loaderId).filter(Boolean))],
+                splitter: (loaders.find((loader) => loader.splitterName) || {}).splitterName || null,
+                summary: options?.summary?.enabled
+                    ? {
+                          enabled: true,
+                          provider: options.summary.name,
+                          model: (options.summary.config as any)?.modelName || null,
+                          label: options.summary.label
+                      }
+                    : { enabled: false },
+                sources: loaders.length,
+                chunks,
+                characters,
+                graph
+            })
+        }
+
+        return { data: rows }
+    } catch (error) {
+        throw new InternalFlowiseError(500, `Error: vibeflowDocStoreService.getEnrichedTable - ${getErrorMessage(error)}`)
+    }
+}
+
 export default {
     cancelJob,
     documentsToPages,
+    getEnrichedTable,
     getGraphEngines,
     getJob,
     getStoreGraph,
     getStoreGraphPaths,
+    getStorePipelineOptions,
     listJobs,
     runAdvancedPipeline,
+    saveStorePipelineOptions,
     searchStoreGraph,
     startAdvancedPipelineJob,
+    syncStoreGraph,
     traverseStoreGraph
 }

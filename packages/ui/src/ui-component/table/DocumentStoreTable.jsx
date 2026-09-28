@@ -14,12 +14,14 @@ import {
     TableHead,
     TableRow,
     TableSortLabel,
+    Stack,
+    Tooltip,
     useTheme,
     Typography
 } from '@mui/material'
 import { tableCellClasses } from '@mui/material/TableCell'
 import DocumentStoreStatus from '@/views/docstore/DocumentStoreStatus'
-import { IconDotsVertical } from '@tabler/icons-react'
+import { IconBolt, IconChartBar, IconChartDots, IconDotsVertical, IconRefresh } from '@tabler/icons-react'
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
     borderColor: theme.palette.grey[900] + 25,
@@ -40,7 +42,17 @@ const StyledTableRow = styled(TableRow)(() => ({
     }
 }))
 
-export const DocumentStoreTable = ({ data, isLoading, onRowClick, images, showActions, onActionMenuClick, actionButtonSx }) => {
+export const DocumentStoreTable = ({
+    data,
+    isLoading,
+    onRowClick,
+    images,
+    showActions,
+    onActionMenuClick,
+    actionButtonSx,
+    enrichment,
+    onGraphAction
+}) => {
     const theme = useTheme()
     const customization = useSelector((state) => state.customization)
 
@@ -89,6 +101,10 @@ export const DocumentStoreTable = ({ data, isLoading, onRowClick, images, showAc
                             <StyledTableCell>Connected flows</StyledTableCell>
                             <StyledTableCell>Total characters</StyledTableCell>
                             <StyledTableCell>Total chunks</StyledTableCell>
+                            {enrichment && <StyledTableCell>Summary</StyledTableCell>}
+                            {enrichment && <StyledTableCell>Splitter</StyledTableCell>}
+                            {enrichment && <StyledTableCell>Sources</StyledTableCell>}
+                            {enrichment && <StyledTableCell>Graph</StyledTableCell>}
                             <StyledTableCell>Loader Types</StyledTableCell>
                             {showActions && (
                                 <StyledTableCell align='right' sx={{ width: 44, pr: 1 }}>
@@ -199,6 +215,112 @@ export const DocumentStoreTable = ({ data, isLoading, onRowClick, images, showAc
                                             <StyledTableCell>{row.whereUsed?.length ?? 0}</StyledTableCell>
                                             <StyledTableCell>{row.totalChars}</StyledTableCell>
                                             <StyledTableCell>{row.totalChunks}</StyledTableCell>
+                                            {enrichment && (
+                                                <StyledTableCell>
+                                                    {enrichment[row.id]?.summary?.enabled ? (
+                                                        <Typography variant='caption'>
+                                                            {enrichment[row.id]?.summary?.label ||
+                                                                enrichment[row.id]?.summary?.model ||
+                                                                enrichment[row.id]?.summary?.provider ||
+                                                                'enabled'}
+                                                        </Typography>
+                                                    ) : (
+                                                        <Typography variant='caption' color='text.secondary'>
+                                                            disabled
+                                                        </Typography>
+                                                    )}
+                                                </StyledTableCell>
+                                            )}
+                                            {enrichment && (
+                                                <StyledTableCell>
+                                                    <Typography variant='caption' color='text.secondary'>
+                                                        {enrichment[row.id]?.splitter || 'none'}
+                                                    </Typography>
+                                                </StyledTableCell>
+                                            )}
+                                            {enrichment && (
+                                                <StyledTableCell>
+                                                    <Typography variant='caption'>
+                                                        {enrichment[row.id]?.sources ?? 0} source(s)
+                                                        {enrichment[row.id]
+                                                            ? ` · ${enrichment[row.id].chunks} chunk(s) · ${
+                                                                  enrichment[row.id].characters
+                                                              } car.`
+                                                            : ''}
+                                                    </Typography>
+                                                </StyledTableCell>
+                                            )}
+                                            {enrichment && (
+                                                <StyledTableCell>
+                                                    {enrichment[row.id] ? (
+                                                        <Typography
+                                                            variant='caption'
+                                                            color={enrichment[row.id].graph?.available ? 'text.primary' : 'text.secondary'}
+                                                        >
+                                                            {enrichment[row.id].graph?.engine} ·{' '}
+                                                            {enrichment[row.id].graph?.available
+                                                                ? `${enrichment[row.id].graph.nodes} nœuds / ${
+                                                                      enrichment[row.id].graph.relations
+                                                                  } relations`
+                                                                : enrichment[row.id].graph?.reason || 'empty'}
+                                                        </Typography>
+                                                    ) : (
+                                                        <Typography variant='caption' color='text.secondary'>
+                                                            n/a
+                                                        </Typography>
+                                                    )}
+                                                </StyledTableCell>
+                                            )}
+                                            {onGraphAction && (
+                                                <StyledTableCell align='right' sx={{ width: 170 }}>
+                                                    <Stack flexDirection='row' sx={{ justifyContent: 'flex-end' }}>
+                                                        <Tooltip title='View graph'>
+                                                            <IconButton
+                                                                size='small'
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    onGraphAction('view', row)
+                                                                }}
+                                                            >
+                                                                <IconChartDots size={16} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title='Graph statistics'>
+                                                            <IconButton
+                                                                size='small'
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    onGraphAction('stats', row)
+                                                                }}
+                                                            >
+                                                                <IconChartBar size={16} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title='Synchronize the knowledge graph from stored chunks'>
+                                                            <IconButton
+                                                                size='small'
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    onGraphAction('sync', row)
+                                                                }}
+                                                            >
+                                                                <IconRefresh size={16} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title='Reindex (advanced pipeline)'>
+                                                            <IconButton
+                                                                size='small'
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    onGraphAction('reindex', row)
+                                                                }}
+                                                            >
+                                                                <IconBolt size={16} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </StyledTableCell>
+                                            )}
                                             <StyledTableCell>
                                                 {images && images[row.id] && (
                                                     <Box
@@ -284,7 +406,9 @@ DocumentStoreTable.propTypes = {
     onRowClick: PropTypes.func,
     showActions: PropTypes.bool,
     onActionMenuClick: PropTypes.func,
-    actionButtonSx: PropTypes.object
+    actionButtonSx: PropTypes.object,
+    enrichment: PropTypes.object,
+    onGraphAction: PropTypes.func
 }
 
 DocumentStoreTable.displayName = 'DocumentStoreTable'
