@@ -40,6 +40,7 @@ const Variables = Loadable(lazy(() => import('@/views/variables')))
 // documents routing
 const Documents = Loadable(lazy(() => import('@/views/docstore')))
 const DocumentStoreDetail = Loadable(lazy(() => import('@/views/docstore/DocumentStoreDetail')))
+const RagTestPage = Loadable(lazy(() => import('@/views/docstore/RagTestPage')))
 const ShowStoredChunks = Loadable(lazy(() => import('@/views/docstore/ShowStoredChunks')))
 const LoaderConfigPreviewChunks = Loadable(lazy(() => import('@/views/docstore/LoaderConfigPreviewChunks')))
 const VectorStoreConfigure = Loadable(lazy(() => import('@/views/docstore/VectorStoreConfigure')))
@@ -192,6 +193,22 @@ const MainRoutes = {
             element: (
                 <RequireAuth permission={'documentStores:view'}>
                     <Documents />
+                </RequireAuth>
+            )
+        },
+        {
+            path: '/document-stores/rag-test',
+            element: (
+                <RequireAuth permission={'documentStores:view'}>
+                    <RagTestPage />
+                </RequireAuth>
+            )
+        },
+        {
+            path: '/document-stores/rag-test/:storeId',
+            element: (
+                <RequireAuth permission={'documentStores:view'}>
+                    <RagTestPage />
                 </RequireAuth>
             )
         },

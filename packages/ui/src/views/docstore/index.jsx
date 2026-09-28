@@ -367,6 +367,14 @@ const Documents = () => {
                             </ToggleButtonGroup>
                         )}
                         <StyledPermissionButton
+                            permissionId={'documentStores:view'}
+                            variant='outlined'
+                            sx={{ borderRadius: 2, height: '100%' }}
+                            onClick={() => navigate('/document-stores/rag-test')}
+                        >
+                            Test RAG
+                        </StyledPermissionButton>
+                        <StyledPermissionButton
                             permissionId={'documentStores:create'}
                             variant='contained'
                             sx={{ borderRadius: 2, height: '100%' }}

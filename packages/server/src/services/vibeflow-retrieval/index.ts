@@ -22,6 +22,7 @@ import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getErrorMessage } from '../../errors/utils'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import documentStoreService from '../documentstore'
+import { createChatModel } from '../vibeflow-docstore'
 
 /**
  * VibeFlow — Hybrid retrieval service (M7).
@@ -165,6 +166,7 @@ export const queryStore = async (params: {
     options?: IHybridRetrievalOptions
     engine?: GraphEngine
     neo4jConfig?: INeo4jConfig
+    generate?: { name?: string; credentialId?: string; config?: Record<string, unknown> }
 }) => {
     try {
         const appServer = getRunningExpressApp()
@@ -231,11 +233,42 @@ export const queryStore = async (params: {
             ? buildRetrievalPrompt({ question: params.query, context: report.trace.context.text, sources: report.results })
             : undefined
 
+        // Optional final generation step: the answer is produced by a real chat model chosen by
+        // the user, from the built context. Without a model the prompt is returned instead.
+        let answer: string | undefined
+        let generationError: string | undefined
+        let generationDurationMs: number | undefined
+        if (params.generate?.name && prompt) {
+            const startedAt = Date.now()
+            try {
+                const model = await createChatModel(params.generate)
+                if (!model) throw new Error('The selected chat model could not be initialized')
+                const response = await model.invoke([
+                    { role: 'system', content: prompt.system },
+                    { role: 'user', content: prompt.user }
+                ])
+                const content = (response as any)?.content
+                answer =
+                    typeof content === 'string'
+                        ? content
+                        : Array.isArray(content)
+                          ? content.map((part: any) => (typeof part === 'string' ? part : part?.text || '')).join('\n')
+                          : ''
+            } catch (error) {
+                generationError = getErrorMessage(error)
+            } finally {
+                generationDurationMs = Date.now() - startedAt
+            }
+        }
+
         return {
             data: {
                 results: report.results,
                 trace: report.trace,
                 prompt,
+                answer,
+                generationError,
+                generationDurationMs,
                 indexedChunks: chunks.length
             }
         }

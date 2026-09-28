@@ -277,7 +277,7 @@ export const documentsToPages = (
 // Summary (real chat model from the existing component nodes)
 // ---------------------------------------------------------------------------
 
-const createChatModel = async (selectedChatModel: { name?: string; credentialId?: string; config?: Record<string, unknown> }) => {
+export const createChatModel = async (selectedChatModel: { name?: string; credentialId?: string; config?: Record<string, unknown> }) => {
     if (!selectedChatModel?.name) return null
     const appServer = getRunningExpressApp()
     const componentNode = (appServer as any).nodesPool.componentNodes[selectedChatModel.name]

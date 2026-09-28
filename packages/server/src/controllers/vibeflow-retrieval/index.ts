@@ -39,7 +39,8 @@ const queryStore = async (req: Request, res: Response, next: NextFunction) => {
                 query: req.body.query,
                 options: req.body.options,
                 engine: req.body.engine,
-                neo4jConfig: req.body.neo4jConfig
+                neo4jConfig: req.body.neo4jConfig,
+                generate: req.body.generate
             })
         )
     } catch (error) {
