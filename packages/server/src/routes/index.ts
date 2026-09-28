@@ -61,6 +61,7 @@ import webhookRouter from './webhook'
 import webhookListenerRouter from './webhook-listener'
 
 import accountRouter from '../enterprise/routes/account.route'
+import vibeflowChatBotRouter from './vibeflow-chatbot'
 import vibeflowSkillsRouter from './vibeflow-skills'
 import auditRouter from '../enterprise/routes/audit'
 import authRouter from '../enterprise/routes/auth'
@@ -135,6 +136,7 @@ router.use('/custom-mcp-servers', customMcpServersRouter)
 router.use('/mcp-server', mcpServerRouter)
 router.use('/mcp', mcpEndpointRouter)
 router.use('/vibeflow-skills', vibeflowSkillsRouter)
+router.use('/vibeflow-chatbot', vibeflowChatBotRouter)
 
 router.use('/auth', authRouter)
 router.use('/audit', IdentityManager.checkFeatureByPlan('feat:login-activity'), auditRouter)
