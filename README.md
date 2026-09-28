@@ -83,7 +83,7 @@
 > ### Windows installer — result obtained in this repository
 >
 > Built and verified here: `packages/vibeflow-desktop/dist/VibeFlow-Setup-3.1.4-x64.exe`
-> (79.9 MB, PE signature `MZ`, SHA-256 `ABBED4E2CE596B835CDFD3194205462925A4ED0BA6D78E48A3675B659DF90881`).
+> (79.9 MB, PE signature `MZ`, SHA-256 `00F8F58EEB5ACFD22BFEDBEF802407DFCA80D48D3A19CCB74A9807CFF1A523B7`).
 >
 > Exact steps used:
 >
@@ -97,6 +97,28 @@
 > installer therefore keeps the default Electron icon. Remove that line when the build runs with the
 > required privileges and the custom icon/metadata is wanted. Signing is skipped when no certificate
 > is configured (`no signing info identified, signing is skipped`).
+>
+> ### Windows installer — how the installed application finds the repository
+>
+> The installer does not embed the monorepo (it would be several GB). The installed `VibeFlow.exe`
+> starts the server from the VibeFlow repository, so it looks for it in this order:
+>
+> 1. the `VIBEFLOW_REPO_ROOT` environment variable;
+> 2. the first line of `<userData>/vibeflow-repo-path.txt`, where `<userData>` is `%APPDATA%\VibeFlow`
+>    on Windows (`~/Library/Application Support/VibeFlow` on macOS, `~/.config/VibeFlow` on Linux);
+> 3. a `vibeflow-repo` folder next to the executable, then inside the packaged `resources` folder;
+> 4. walking up from the executable, then from the application directory, looking for
+>    `packages/server/package.json` (so launching the installed app from inside the repository works);
+> 5. the parent directory of `packages/vibeflow-desktop` in development (`pnpm start`).
+>
+> The repository must be installed and built (`pnpm install && pnpm build`). When it cannot be found,
+> or when it exists but is not built, VibeFlow shows a dialog that lists every location it searched and
+> the exact path of the file to create. Server output is logged to
+> `%APPDATA%\VibeFlow\logs\vibeflow-server.log`.
+>
+> Runtime verified on this machine from `dist/win-unpacked/VibeFlow.exe`: the embedded server answered
+> `GET /api/v1/version` with `{"version":"3.1.4"}` and the UI was served with the title
+> `VibeFlow - Build AI Agents, Visually`; the process tree then stopped cleanly.
 >
 > ### macOS — `.dmg`, step by step (run on a Mac)
 >
