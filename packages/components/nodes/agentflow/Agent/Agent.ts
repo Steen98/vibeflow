@@ -20,6 +20,7 @@ import { Tool } from '@langchain/core/tools'
 import { ARTIFACTS_PREFIX, SOURCE_DOCUMENTS_PREFIX, TOOL_ARGS_PREFIX } from '../../../src/agents'
 import { flatten } from 'lodash'
 import { toolSchemaToJsonSchema, type ToolJsonSchema } from '../../../src/utils'
+import { getSkillsPrompt, listSkills as listVibeFlowSkills } from '../../../src/vibeflowSkills'
 import { getErrorMessage } from '../../../src/error'
 import { DataSource } from 'typeorm'
 import { randomBytes } from 'crypto'
@@ -291,6 +292,15 @@ class Agent_Agentflow implements INode {
                         optional: true
                     }
                 ]
+            },
+            {
+                label: 'Skills',
+                name: 'agentSkills',
+                type: 'asyncMultiOptions',
+                loadMethod: 'listSkills',
+                refresh: true,
+                description: 'VibeFlow skills whose instructions are injected into this agent system prompt',
+                optional: true
             },
             {
                 label: 'Knowledge (Document Stores)',
@@ -675,6 +685,21 @@ class Agent_Agentflow implements INode {
                 }
             }
             return returnOptions
+        },
+        async listSkills(_: INodeData, _options: ICommonObject): Promise<INodeOptionsValue[]> {
+            // VibeFlow: skills imported from the Skills tab of the Tools page (only enabled ones).
+            try {
+                return listVibeFlowSkills()
+                    .filter((skill) => skill.enabled)
+                    .map((skill) => ({
+                        label: skill.name,
+                        name: skill.id,
+                        description: skill.description || skill.id
+                    }))
+            } catch (error) {
+                console.error('Error listing VibeFlow skills:', error)
+                return []
+            }
         },
         async listRuntimeStateKeys(_: INodeData, options: ICommonObject): Promise<INodeOptionsValue[]> {
             const previousNodes = options.previousNodes as ICommonObject[]
@@ -1083,6 +1108,15 @@ class Agent_Agentflow implements INode {
                     } else {
                         messages.push({ role, content })
                     }
+                }
+            }
+
+            // VibeFlow: inject the instructions of the skills selected on this node as a system message.
+            const selectedSkills = convertMultiOptionsToStringArray(nodeData.inputs?.agentSkills)
+            if (selectedSkills.length) {
+                const skillsPrompt = getSkillsPrompt(selectedSkills)
+                if (skillsPrompt) {
+                    messages.unshift({ role: 'system', content: skillsPrompt })
                 }
             }
 

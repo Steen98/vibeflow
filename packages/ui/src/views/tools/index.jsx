@@ -10,6 +10,7 @@ import ItemCard from '@/ui-component/cards/ItemCard'
 import MCPItemCard from '@/ui-component/cards/MCPItemCard'
 import ToolDialog from './ToolDialog'
 import CustomMcpServerDialog from './CustomMcpServerDialog'
+import SkillsTab from './SkillsTab'
 import ViewHeader from '@/layout/MainLayout/ViewHeader'
 import ErrorBoundary from '@/ErrorBoundary'
 import { ToolsTable } from '@/ui-component/table/ToolsListTable'
@@ -399,7 +400,9 @@ const Tools = () => {
                         <ViewHeader
                             onSearchChange={onSearchChange}
                             search={true}
-                            searchPlaceholder={tabValue === 0 ? 'Search Tools' : 'Search Custom MCP Servers'}
+                            searchPlaceholder={
+                                tabValue === 0 ? 'Search Tools' : tabValue === 1 ? 'Search Custom MCP Servers' : 'Search Skills'
+                            }
                             title='Tools'
                             description='External functions or APIs the agent can use to take action'
                         />
@@ -416,11 +419,15 @@ const Tools = () => {
                             <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} aria-label='tools tabs'>
                                 <Tab label='Custom Tools' />
                                 <Tab label='Custom MCP Servers' />
+                                <Tab label='Skills' />
                             </Tabs>
-                            <Box sx={{ pb: 1 }}>{tabValue === 0 ? renderCustomToolsToolbar() : renderMcpServersToolbar()}</Box>
+                            <Box sx={{ pb: 1 }}>
+                                {tabValue === 0 ? renderCustomToolsToolbar() : tabValue === 1 ? renderMcpServersToolbar() : null}
+                            </Box>
                         </Box>
                         {tabValue === 0 && renderCustomToolsTab()}
                         {tabValue === 1 && renderMcpServersTab()}
+                        {tabValue === 2 && <SkillsTab setError={setError} />}
                     </Stack>
                 )}
             </MainCard>

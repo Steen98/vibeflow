@@ -61,6 +61,7 @@ import webhookRouter from './webhook'
 import webhookListenerRouter from './webhook-listener'
 
 import accountRouter from '../enterprise/routes/account.route'
+import vibeflowSkillsRouter from './vibeflow-skills'
 import auditRouter from '../enterprise/routes/audit'
 import authRouter from '../enterprise/routes/auth'
 import loginMethodRouter from '../enterprise/routes/login-method.route'
@@ -133,6 +134,7 @@ router.use('/text-to-speech', textToSpeechRouter)
 router.use('/custom-mcp-servers', customMcpServersRouter)
 router.use('/mcp-server', mcpServerRouter)
 router.use('/mcp', mcpEndpointRouter)
+router.use('/vibeflow-skills', vibeflowSkillsRouter)
 
 router.use('/auth', authRouter)
 router.use('/audit', IdentityManager.checkFeatureByPlan('feat:login-activity'), auditRouter)
