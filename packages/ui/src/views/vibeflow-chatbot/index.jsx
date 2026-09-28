@@ -74,7 +74,7 @@ const VibeFlowChatBot = () => {
         setMonitoringLoading(true)
         try {
             const response = await vibeflowChatBotApi.getMonitoring(sessionId ? { sessionId } : {})
-            setMonitoring(response.data)
+            setMonitoring(response.data?.data || null)
         } catch {
             setMonitoring(null)
         } finally {
@@ -121,9 +121,10 @@ const VibeFlowChatBot = () => {
         setMessagesLoading(true)
         try {
             const response = await vibeflowChatBotApi.getMessages(sessionId, { limit: options.limit || MESSAGE_PAGE_SIZE })
-            if (options.prepend) setMessages((previous) => [...(response.data || []), ...previous])
-            else setMessages(response.data || [])
-            setHasMore(Boolean(response.hasMore))
+            const payload = response.data || {}
+            if (options.prepend) setMessages((previous) => [...(payload.data || []), ...previous])
+            else setMessages(payload.data || [])
+            setHasMore(Boolean(payload.hasMore))
         } catch (error) {
             setNotice({ severity: 'error', text: extractError(error) })
         } finally {
@@ -150,8 +151,9 @@ const VibeFlowChatBot = () => {
             setRunningExecution(null)
             try {
                 const response = await vibeflowChatBotApi.getSession(sessionId)
-                setActiveSession(response.data)
-                if (response.data?.defaultWorkflowId) setSelectedWorkflowId(response.data.defaultWorkflowId)
+                const session = response.data?.data || null
+                setActiveSession(session)
+                if (session?.defaultWorkflowId) setSelectedWorkflowId(session.defaultWorkflowId)
             } catch (error) {
                 setNotice({ severity: 'error', text: extractError(error) })
             }
@@ -195,9 +197,10 @@ const VibeFlowChatBot = () => {
             defaultWorkflowId: selectedWorkflowId || undefined,
             title: options.title
         })
+        const session = response.data?.data || null
         await loadSessions()
-        await openSession(response.data.id)
-        return response.data
+        if (session?.id) await openSession(session.id)
+        return session
     }
 
     const handleNewSession = async () => {
@@ -216,7 +219,7 @@ const VibeFlowChatBot = () => {
             await loadSessions()
             if (session.id === activeSessionId) {
                 const refreshed = await vibeflowChatBotApi.getSession(session.id)
-                setActiveSession(refreshed.data)
+                setActiveSession(refreshed.data?.data || null)
             }
         } catch (error) {
             setNotice({ severity: 'error', text: extractError(error) })
@@ -242,9 +245,7 @@ const VibeFlowChatBot = () => {
     const handleAssignWorkspace = async (workspaceId) => {
         try {
             if (!activeSessionId) {
-                const created = await vibeflowChatBotApi.createSession({ workspaceId, defaultWorkflowId: selectedWorkflowId || undefined })
-                await loadSessions()
-                await openSession(created.data.id)
+                await createSession({ workspaceId })
                 return
             }
             await vibeflowChatBotApi.updateSession(activeSessionId, { workspaceId })
@@ -282,7 +283,7 @@ const VibeFlowChatBot = () => {
             let execution = null
             try {
                 const createdExecution = await vibeflowChatBotApi.createExecution(sessionId, { workflowId })
-                execution = createdExecution.data
+                execution = createdExecution.data?.data || null
                 setRunningExecution(execution)
             } catch {
                 execution = null
