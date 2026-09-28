@@ -1,0 +1,19 @@
+{
+    "name": "vibeflow-desktop",
+    "version": "3.1.4",
+    "private": true,
+    "description": "VibeFlow desktop application (Electron wrapper around the VibeFlow / Flowise server)",
+    "author": "VibeFlow",
+    "license": "Apache-2.0",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dist:win": "electron-builder --win --x64",
+        "dist:linux": "electron-builder --linux --x64",
+        "dist:mac": "electron-builder --mac"
+    },
+    "devDependencies": {
+        "electron": "^33.2.0",
+        "electron-builder": "^25.1.8"
+    }
+}

@@ -1,5 +1,86 @@
 <!-- markdownlint-disable MD030 -->
 
+> ## VibeFlow — fork of Flowise
+>
+> **VibeFlow is an independent fork of [Flowise](https://github.com/FlowiseAI/Flowise) (Apache-2.0).**
+> The product name, titles, favicon, UI texts and documentation are VibeFlow; the internal package
+> identifiers stay those of Flowise so the fork can keep following upstream.
+>
+> What this fork adds on top of Flowise:
+>
+> - a conversational execution layer, the **ChatBot** (sessions, workspaces bound to a host working
+>   directory, attachments, voice input with a Speech-to-Text adapter, SSE streaming, retry/stop,
+>   and real AI monitoring: CPU/RAM/GPU, provider balance, context usage);
+> - **hybrid Document Stores**: a vector store *and* its knowledge graph, created/versioned/deleted
+>   together, with an Advanced Document Processing pipeline (fractionator ≤ 3 pages, cleaner,
+>   temporary Markdown backups, optional summary), an enriched table and an interactive graph viewer;
+> - a **hybrid retrieval pipeline** (prompt optimisation, axis decomposition, variants, semantic +
+>   BM25 + graph retrievers, RRF fusion, reranking, top-K ≤ 50) with a **Test RAG** interface that
+>   shows every step and the full provenance chain;
+> - **8 native tools** (READ, WRITE, EDIT, DELETE, LS, GREP, BASH, GIT), **3 native MCP servers**
+>   (Serena, Playwright, Chrome DevTools), a dedicated **MCP Servers** section in the Agent node and
+>   a **Skills** registry (`.zip` / `.skill` import, `SKILL.md` format).
+>
+> Module/network restrictions applied to AI agents and Custom Tools are lifted by default
+> (`VIBEFLOW_UNRESTRICTED_MODULES`, `VIBEFLOW_UNRESTRICTED_NETWORK`). Set them to `false` to restore
+> the upstream hardening, or `VIBEFLOW_UI_PROFILE=upstream` to restore the original sidebar.
+>
+> ## Desktop builds
+>
+> The desktop shell lives in `packages/vibeflow-desktop` (Electron + electron-builder). It starts the
+> local VibeFlow server as a child process and loads the UI from it, so the database, storage and
+> `.env` remain exactly those of the web version.
+>
+> **Prerequisite for every platform**: the VibeFlow repository must be present with its dependencies
+> installed (`pnpm install && pnpm build` at the repository root). The desktop shell deliberately does
+> not bundle the monorepo (it would be several GB); it launches the server from the repository so the
+> desktop and web versions always share the same data and configuration.
+>
+> **Windows (installer `.exe`, NSIS) — build on Windows or a Windows CI runner**
+>
+> ```bash
+> cd packages/vibeflow-desktop
+> npm install
+> npm run dist:win        # -> dist/VibeFlow-Setup-<version>-x64.exe
+> ```
+>
+> The installer lets the user choose the installation directory and creates desktop and start-menu
+> shortcuts. A `.exe` cannot be produced from Linux/macOS without Wine, so only the Windows path is
+> documented here.
+>
+> **Linux (`.deb` and `.AppImage`) — build on Linux or a Linux CI runner**
+>
+> ```bash
+> sudo apt-get install -y rpm fakeroot dpkg
+> cd packages/vibeflow-desktop
+> npm install
+> npm run dist:linux      # -> dist/VibeFlow-<version>-x64.AppImage and dist/VibeFlow-<version>-amd64.deb
+> chmod +x dist/VibeFlow-*.AppImage && ./dist/VibeFlow-*.AppImage
+> sudo dpkg -i dist/VibeFlow-*.deb
+> ```
+>
+> **macOS (`.dmg`) — build on a Mac or a macOS CI runner**
+>
+> ```bash
+> cd packages/vibeflow-desktop
+> npm install
+> npm run dist:mac        # -> dist/VibeFlow-<version>-<arch>.dmg (x64 and arm64)
+> ```
+>
+> Signing/notarisation needs an Apple Developer certificate; without it the produced `.dmg` is
+> unsigned and macOS shows the usual "unidentified developer" warning (right-click → Open).
+> A `.dmg` cannot be produced from Windows.
+>
+> **If `npm install` stalls on the Electron download**, retry with a mirror, for example:
+>
+> ```bash
+> npm install --electron_mirror=https://github.com/electron/electron/releases/download/v
+> ```
+>
+> (or set `ELECTRON_MIRROR` to a local mirror). Electron downloads ~100 MB from GitHub releases
+> during `npm install`, which is the only step that needs network access.
+
+
 <p align="center">
 <img src="https://github.com/FlowiseAI/Flowise/blob/main/images/flowise_white.svg#gh-light-mode-only">
 <img src="https://github.com/FlowiseAI/Flowise/blob/main/images/flowise_dark.svg#gh-dark-mode-only">
