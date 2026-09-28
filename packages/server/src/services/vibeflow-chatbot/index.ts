@@ -1,4 +1,4 @@
-import { Request } from 'express'
+import { Request, Response } from 'express'
 import { StatusCodes } from 'http-status-codes'
 import {
     appendMessage,
@@ -19,7 +19,9 @@ import {
     listWorkspaces,
     updateExecution,
     updateSession,
-    updateWorkspace
+    updateWorkspace,
+    getSpeechToTextCapabilities,
+    transcribeAudio
 } from 'flowise-components'
 import { ChatFlow } from '../../database/entities/ChatFlow'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
@@ -41,6 +43,36 @@ import { collectMonitoring } from './monitoring'
 const EXECUTABLE_WORKFLOW_TYPES = ['CHATFLOW', 'AGENTFLOW', 'MULTIAGENT']
 
 const isQueueMode = (): boolean => process.env.MODE === MODE.QUEUE
+
+/** Global upload size limit, used to validate attachments before handing them to the engine. */
+const getUploadSizeLimitBytes = (): number => {
+    const raw = process.env.FLOWISE_FILE_SIZE_LIMIT || process.env.FILE_SIZE_LIMIT || '50mb'
+    const match = /^(\d+)\s*(b|kb|mb|gb)?$/i.exec(String(raw).trim())
+    if (!match) return 50 * 1024 * 1024
+    const value = Number(match[1])
+    const unit = (match[2] || 'mb').toLowerCase()
+    const factor = unit === 'b' ? 1 : unit === 'kb' ? 1024 : unit === 'gb' ? 1024 ** 3 : 1024 ** 2
+    return value * factor
+}
+
+const validateUploads = (uploads?: any[]): void => {
+    if (!Array.isArray(uploads) || !uploads.length) return
+    const limit = getUploadSizeLimitBytes()
+    for (const upload of uploads) {
+        if (!upload?.name) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Every attachment must provide a name')
+        }
+        if (typeof upload.data === 'string') {
+            const bytes = Math.floor((upload.data.length * 3) / 4)
+            if (bytes > limit) {
+                throw new InternalFlowiseError(
+                    StatusCodes.BAD_REQUEST,
+                    `Attachment "${upload.name}" exceeds the configured limit of ${Math.round(limit / (1024 * 1024))} MB`
+                )
+            }
+        }
+    }
+}
 
 const toInternalError = (error: unknown, where: string, status: StatusCodes = StatusCodes.INTERNAL_SERVER_ERROR) => {
     if (error instanceof InternalFlowiseError) return error
@@ -282,6 +314,8 @@ const executeWorkflow = async (
         throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'A question is required')
     }
 
+    validateUploads(body?.uploads)
+
     // Bounded conversational context (never the whole history unless explicitly asked for)
     let contextMessages: { role: string; content: string }[] = []
     if (body?.includeContext) {
@@ -382,6 +416,187 @@ const executeWorkflow = async (
     }
 }
 
+// ---------------------------------------------------------------------------
+// Capabilities (speech-to-text, uploads) — never advertise what is not configured
+// ---------------------------------------------------------------------------
+
+const getWorkflowCapabilities = async (workflowId: string) => {
+    try {
+        const appServer = getRunningExpressApp()
+        const flow = await appServer.AppDataSource.getRepository(ChatFlow).findOneBy({ id: workflowId })
+        if (!flow) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Workflow ${workflowId} not found`)
+        return {
+            data: {
+                workflowId,
+                type: flow.type,
+                speechToText: getSpeechToTextCapabilities((flow as any).speechToText),
+                uploads: { supported: true, maxFileSizeBytes: getUploadSizeLimitBytes() }
+            }
+        }
+    } catch (error) {
+        throw toInternalError(error, 'getWorkflowCapabilities', StatusCodes.NOT_FOUND)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Speech-to-text (recorder)
+// ---------------------------------------------------------------------------
+
+const transcribeAudioForSession = async (
+    sessionId: string,
+    body: { audioBase64?: string; mime?: string; fileName?: string; language?: string; workflowId?: string },
+    orgId?: string
+) => {
+    const session = getSession(sessionId)
+    if (!session) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+
+    const workflowId = body?.workflowId || session.defaultWorkflowId
+    if (!workflowId) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'No workflow selected for this session')
+    if (!body?.audioBase64) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'audioBase64 is required')
+
+    const buffer = Buffer.from(body.audioBase64, 'base64')
+    if (!buffer.length) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'The provided audio is empty')
+
+    const appServer = getRunningExpressApp()
+    const flow = await appServer.AppDataSource.getRepository(ChatFlow).findOneBy({ id: workflowId })
+    if (!flow) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Workflow ${workflowId} not found`)
+
+    try {
+        const result = await transcribeAudio({
+            buffer,
+            mime: body.mime || 'audio/webm',
+            fileName: body.fileName || `vibeflow-recording-${Date.now()}.webm`,
+            chatflowId: workflowId,
+            chatId: sessionId,
+            orgId,
+            language: body.language,
+            workflowSpeechToText: (flow as any).speechToText
+        })
+        return { data: result }
+    } catch (error) {
+        throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, getErrorMessage(error))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Streaming execution (SSE) — progressive rendering when the workflow supports it
+// ---------------------------------------------------------------------------
+
+const executeWorkflowStream = async (
+    req: Request,
+    res: Response,
+    sessionId: string,
+    body: {
+        question?: string
+        workflowId?: string
+        executionId?: string
+        uploads?: any[]
+        overrideConfig?: any
+        includeContext?: boolean
+    }
+) => {
+    const session = getSession(sessionId)
+    if (!session) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+
+    const workflowId = body?.workflowId || session.defaultWorkflowId
+    if (!workflowId) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'No workflow selected for this session')
+
+    const question = (body?.question || '').trim()
+    if (!question.length) throw new InternalFlowiseError(StatusCodes.PRECONDITION_FAILED, 'A question is required')
+
+    validateUploads(body?.uploads)
+
+    const contextMessages = body?.includeContext ? buildSessionContext(sessionId).messages : []
+    const userMessage = appendMessage(sessionId, {
+        role: 'user',
+        content: question,
+        workflowId,
+        metadata: { workflowId, contextMessages: contextMessages.length }
+    })
+
+    const providedExecutionId = body?.executionId
+    const preCreated = providedExecutionId ? getExecution(sessionId, providedExecutionId) : undefined
+    const execution =
+        preCreated ||
+        createExecution(sessionId, {
+            workflowId,
+            messageId: userMessage.id,
+            cancellationSupported: isQueueMode(),
+            usedContextMessages: contextMessages.length
+        })
+    updateExecution(sessionId, execution.id, {
+        status: 'STREAMING',
+        startTime: new Date().toISOString(),
+        messageId: userMessage.id,
+        workflowId
+    })
+
+    const appServer = getRunningExpressApp()
+    const sseStreamer = (appServer as any).sseStreamer
+    sseStreamer.addClient(sessionId, res)
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    res.setHeader('X-Accel-Buffering', 'no')
+    res.flushHeaders()
+
+    const contextualQuestion = contextMessages.length
+        ? `${contextMessages
+              .map((message) => `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`)
+              .join('\n')}\nUser: ${question}`
+        : question
+
+    try {
+        const predictionRequest = {
+            ...req,
+            params: { ...(req.params || {}), id: workflowId },
+            body: {
+                question: contextualQuestion,
+                chatId: sessionId,
+                streaming: true,
+                ...(body?.overrideConfig ? { overrideConfig: body.overrideConfig } : {}),
+                ...(body?.uploads ? { uploads: body.uploads } : {})
+            }
+        } as unknown as Request
+
+        const prediction = await utilBuildChatflow(predictionRequest, true)
+        const text = typeof prediction === 'string' ? prediction : (prediction as any)?.text ?? ''
+
+        const assistantMessage = appendMessage(sessionId, {
+            role: 'assistant',
+            content: text,
+            contentType: 'markdown',
+            workflowId,
+            executionId: execution.id,
+            metadata: {
+                usedTools: (prediction as any)?.usedTools,
+                sourceDocuments: (prediction as any)?.sourceDocuments,
+                streaming: true,
+                workflowId
+            }
+        })
+        const completed = updateExecution(sessionId, execution.id, { status: 'COMPLETED' })
+        sseStreamer.streamCustomEvent(sessionId, 'vibeflowChatBotDone', {
+            userMessage,
+            assistantMessage,
+            execution: completed
+        })
+    } catch (error) {
+        const message = getErrorMessage(error)
+        updateExecution(sessionId, execution.id, { status: 'FAILED', error: message })
+        const systemMessage = appendMessage(sessionId, {
+            role: 'system',
+            content: `Workflow execution failed: ${message}`,
+            workflowId,
+            executionId: execution.id,
+            metadata: { error: true, workflowId }
+        })
+        sseStreamer.streamCustomEvent(sessionId, 'vibeflowChatBotError', { message, systemMessage })
+    } finally {
+        sseStreamer.removeClient(sessionId)
+    }
+}
+
 const stopExecution = async (sessionId: string, executionId: string) => {
     const execution = getExecution(sessionId, executionId)
     if (!execution) throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Execution ${executionId} not found`)
@@ -420,6 +635,7 @@ export default {
     deleteSessionById,
     deleteWorkspaceById,
     executeWorkflow,
+    executeWorkflowStream,
     getContext,
     getExecutions,
     getMessages,
@@ -427,6 +643,7 @@ export default {
     getSessionById,
     getSessions,
     getStats,
+    getWorkflowCapabilities,
     getWorkflows,
     getWorkspaces,
     postExecution,
@@ -435,5 +652,6 @@ export default {
     postWorkspace,
     putSession,
     putWorkspace,
-    stopExecution
+    stopExecution,
+    transcribeAudioForSession
 }

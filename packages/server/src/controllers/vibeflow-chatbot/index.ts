@@ -73,6 +73,33 @@ const getWorkflows = async (req: Request, res: Response, next: NextFunction) => 
     }
 }
 
+const getWorkflowCapabilities = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const id = requireParam(req.params?.id, 'Error: vibeflowChatBotController.getWorkflowCapabilities - workflow id not provided!')
+        return res.json(await vibeflowChatBotService.getWorkflowCapabilities(id))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const transcribeAudio = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const id = requireParam(req.params?.id, 'Error: vibeflowChatBotController.transcribeAudio - session id not provided!')
+        return res.json(await vibeflowChatBotService.transcribeAudioForSession(id, req.body, req.user?.activeOrganizationId))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const executeWorkflowStream = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const id = requireParam(req.params?.id, 'Error: vibeflowChatBotController.executeWorkflowStream - session id not provided!')
+        await vibeflowChatBotService.executeWorkflowStream(req, res, id, req.body)
+    } catch (error) {
+        next(error)
+    }
+}
+
 // -------------------------------- sessions --------------------------------
 
 const getSessions = async (req: Request, res: Response, next: NextFunction) => {
@@ -205,6 +232,7 @@ export default {
     deleteSession,
     deleteWorkspace,
     executeWorkflow,
+    executeWorkflowStream,
     getContext,
     getExecutions,
     getMessages,
@@ -212,6 +240,7 @@ export default {
     getSessionById,
     getSessions,
     getStats,
+    getWorkflowCapabilities,
     getWorkflows,
     getWorkspaces,
     postExecution,
@@ -220,5 +249,6 @@ export default {
     postWorkspace,
     putSession,
     putWorkspace,
-    stopExecution
+    stopExecution,
+    transcribeAudio
 }

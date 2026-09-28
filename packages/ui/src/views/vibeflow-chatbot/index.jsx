@@ -6,8 +6,6 @@ import {
     Box,
     Button,
     Chip,
-    CircularProgress,
-    Divider,
     IconButton,
     LinearProgress,
     MenuItem,
@@ -17,16 +15,17 @@ import {
     Tooltip,
     Typography
 } from '@mui/material'
-import { alpha, useTheme } from '@mui/material/styles'
 
 // project imports
 import MainCard from '@/ui-component/cards/MainCard'
 import ConversationMessage from './ConversationMessage'
 import SessionSidebar from './SessionSidebar'
+import ComposerBar from './ComposerBar'
+import { streamChatBotExecute } from './streaming'
 import vibeflowChatBotApi from '@/api/vibeflowChatBot'
 
 // icons
-import { IconLayoutSidebarRightExpand, IconSend } from '@tabler/icons-react'
+import { IconLayoutSidebarRightExpand } from '@tabler/icons-react'
 
 const MESSAGE_PAGE_SIZE = 40
 const MONITORING_INTERVAL_MS = 10000
@@ -34,15 +33,12 @@ const MONITORING_INTERVAL_MS = 10000
 const extractError = (error) => error?.response?.data?.message || error?.message || 'Unexpected error'
 
 /**
- * VibeFlow ChatBot.
- *
- * Execution interface for the existing workflows: three zones (conversation, input, right
- * sidebar). It never replaces the workflow editor, it runs the workflows through the real
- * Flowise prediction pipeline.
+ * VibeFlow ChatBot — conversational execution layer for the existing workflows.
+ * Three zones: conversation, input (text / attachments / voice), right sidebar (sessions,
+ * workspaces, AI monitoring). The workflow is never re-implemented here: every execution goes
+ * through the real Flowise prediction pipeline.
  */
 const VibeFlowChatBot = () => {
-    const theme = useTheme()
-
     const [sessions, setSessions] = useState([])
     const [activeSessionId, setActiveSessionId] = useState(null)
     const [activeSession, setActiveSession] = useState(null)
@@ -54,9 +50,12 @@ const VibeFlowChatBot = () => {
     const [workflowsLoading, setWorkflowsLoading] = useState(true)
     const [workspaces, setWorkspaces] = useState([])
     const [selectedWorkflowId, setSelectedWorkflowId] = useState('')
+    const [capabilities, setCapabilities] = useState(null)
 
     const [input, setInput] = useState('')
+    const [attachments, setAttachments] = useState([])
     const [sending, setSending] = useState(false)
+    const [streamingId, setStreamingId] = useState(null)
     const [runningExecution, setRunningExecution] = useState(null)
     const [notice, setNotice] = useState(null)
 
@@ -67,8 +66,9 @@ const VibeFlowChatBot = () => {
 
     const scrollRef = useRef(null)
     const bottomRef = useRef(null)
+    const abortControllerRef = useRef(null)
 
-    // ------------------------------ data loading ------------------------------
+    // ------------------------------ loaders ------------------------------
 
     const loadMonitoring = useCallback(async (sessionId) => {
         setMonitoringLoading(true)
@@ -121,16 +121,26 @@ const VibeFlowChatBot = () => {
         setMessagesLoading(true)
         try {
             const response = await vibeflowChatBotApi.getMessages(sessionId, { limit: options.limit || MESSAGE_PAGE_SIZE })
-            if (options.prepend) {
-                setMessages((previous) => [...(response.data || []), ...previous])
-            } else {
-                setMessages(response.data || [])
-            }
+            if (options.prepend) setMessages((previous) => [...(response.data || []), ...previous])
+            else setMessages(response.data || [])
             setHasMore(Boolean(response.hasMore))
         } catch (error) {
             setNotice({ severity: 'error', text: extractError(error) })
         } finally {
             setMessagesLoading(false)
+        }
+    }, [])
+
+    const loadCapabilities = useCallback(async (workflowId) => {
+        if (!workflowId) {
+            setCapabilities(null)
+            return
+        }
+        try {
+            const response = await vibeflowChatBotApi.getWorkflowCapabilities(workflowId)
+            setCapabilities(response.data?.data || null)
+        } catch {
+            setCapabilities(null)
         }
     }, [])
 
@@ -160,6 +170,10 @@ const VibeFlowChatBot = () => {
     }, [])
 
     useEffect(() => {
+        loadCapabilities(selectedWorkflowId)
+    }, [selectedWorkflowId, loadCapabilities])
+
+    useEffect(() => {
         const timer = setInterval(() => loadMonitoring(activeSessionId), MONITORING_INTERVAL_MS)
         return () => clearInterval(timer)
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,7 +187,7 @@ const VibeFlowChatBot = () => {
         if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages, hasMore])
 
-    // ------------------------------ actions ------------------------------
+    // ------------------------------ sessions ------------------------------
 
     const createSession = async (options = {}) => {
         const response = await vibeflowChatBotApi.createSession({
@@ -241,6 +255,8 @@ const VibeFlowChatBot = () => {
         }
     }
 
+    // ------------------------------ execution ------------------------------
+
     const runRequest = async (question, options = {}) => {
         if (!question || !question.trim().length) return
         const workflowId = options.workflowId || selectedWorkflowId
@@ -260,15 +276,13 @@ const VibeFlowChatBot = () => {
                     workspaceId: activeSession?.workspaceId
                 })
                 sessionId = created.id
-                if (options.asBranch) await loadMessages(sessionId)
             }
 
-            // Pre-create the execution so "Stop" is usable while the workflow runs.
-            // Pre-creation is optional: the server creates the execution when it is missing.
+            // Pre-create the execution so "Stop" is usable while the workflow runs
             let execution = null
             try {
-                const created = await vibeflowChatBotApi.createExecution(sessionId, { workflowId })
-                execution = created.data
+                const createdExecution = await vibeflowChatBotApi.createExecution(sessionId, { workflowId })
+                execution = createdExecution.data
                 setRunningExecution(execution)
             } catch {
                 execution = null
@@ -280,28 +294,124 @@ const VibeFlowChatBot = () => {
                 role: 'user',
                 content: question,
                 workflowId,
-                attachments: [],
+                attachments: (attachments || []).map(({ data: _data, ...rest }) => ({ ...rest, status: 'uploaded' })),
                 createdAt: new Date().toISOString()
             }
             setMessages((previous) => [...previous, optimisticMessage])
 
-            const response = await vibeflowChatBotApi.executeWorkflow(sessionId, { question, workflowId, executionId: execution?.id })
-            const payload = response.data || {}
-            setMessages((previous) =>
-                [
-                    ...previous.filter((message) => message.id !== optimisticMessage.id),
-                    payload.userMessage,
-                    payload.assistantMessage
-                ].filter(Boolean)
-            )
+            const uploads = (attachments || []).map((attachment) => ({
+                data: attachment.data,
+                name: attachment.name,
+                type: 'file',
+                mime: attachment.mime || attachment.type
+            }))
+
+            const streamId = `stream_${Date.now()}`
+            setStreamingId(streamId)
+            const abortController = new AbortController()
+            abortControllerRef.current = abortController
+
+            let streamedText = ''
+            let completed = false
+
+            try {
+                await streamChatBotExecute({
+                    sessionId,
+                    body: {
+                        question,
+                        workflowId,
+                        executionId: execution?.id,
+                        uploads,
+                        includeContext: options.includeContext
+                    },
+                    signal: abortController.signal,
+                    onEvent: (event) => {
+                        if (!event?.event) return
+                        if (event.event === 'token') {
+                            streamedText += typeof event.data === 'string' ? event.data : ''
+                            setMessages((previous) => {
+                                const without = previous.filter((message) => message.id !== streamId)
+                                return [
+                                    ...without,
+                                    {
+                                        id: streamId,
+                                        sessionId,
+                                        role: 'assistant',
+                                        content: streamedText,
+                                        workflowId,
+                                        executionId: execution?.id,
+                                        createdAt: new Date().toISOString(),
+                                        metadata: { streaming: true, workflowId }
+                                    }
+                                ]
+                            })
+                        } else if (event.event === 'vibeflowChatBotDone') {
+                            completed = true
+                            const payload = event.data || {}
+                            setMessages((previous) =>
+                                [
+                                    ...previous.filter((message) => message.id !== streamId && message.id !== optimisticMessage.id),
+                                    payload.userMessage,
+                                    payload.assistantMessage
+                                ].filter(Boolean)
+                            )
+                        } else if (event.event === 'vibeflowChatBotError') {
+                            completed = true
+                            const payload = event.data || {}
+                            setMessages((previous) =>
+                                [
+                                    ...previous.filter((message) => message.id !== streamId && message.id !== optimisticMessage.id),
+                                    payload.systemMessage
+                                ].filter(Boolean)
+                            )
+                            setNotice({ severity: 'error', text: payload.message })
+                        }
+                    }
+                })
+
+                if (!completed) {
+                    // Stream closed without the final event: fall back to a reload from the store
+                    await loadMessages(sessionId)
+                }
+            } catch (streamError) {
+                if (streamError?.name === 'AbortError') {
+                    setNotice({ severity: 'info', text: 'Streaming request aborted.' })
+                    await loadMessages(sessionId)
+                } else {
+                    // Streaming unavailable: fall back to the non streaming endpoint (real execution too)
+                    try {
+                        const response = await vibeflowChatBotApi.executeWorkflow(sessionId, {
+                            question,
+                            workflowId,
+                            executionId: execution?.id,
+                            uploads
+                        })
+                        const payload = response.data || {}
+                        setMessages((previous) =>
+                            [
+                                ...previous.filter((message) => message.id !== streamId && message.id !== optimisticMessage.id),
+                                payload.userMessage,
+                                payload.assistantMessage
+                            ].filter(Boolean)
+                        )
+                    } catch (fallbackError) {
+                        setNotice({ severity: 'error', text: extractError(fallbackError) })
+                        await loadMessages(sessionId)
+                    }
+                }
+            }
+
             await loadSessions()
             await loadMonitoring(sessionId)
         } catch (error) {
             setNotice({ severity: 'error', text: extractError(error) })
             if (activeSessionId) await loadMessages(activeSessionId)
         } finally {
+            abortControllerRef.current = null
+            setStreamingId(null)
             setSending(false)
             setRunningExecution(null)
+            setAttachments([])
         }
     }
 
@@ -321,7 +431,20 @@ const VibeFlowChatBot = () => {
     }
 
     const handleStop = async () => {
-        if (!activeSessionId || !runningExecution?.id) return
+        if (abortControllerRef.current) {
+            try {
+                abortControllerRef.current.abort()
+            } catch {
+                /* ignored */
+            }
+        }
+        if (!activeSessionId || !runningExecution?.id) {
+            setNotice({
+                severity: 'warning',
+                text: 'Stop requested. No cancellation handle is available for this run, so the workflow may keep running server side.'
+            })
+            return
+        }
         try {
             const response = await vibeflowChatBotApi.stopExecution(activeSessionId, runningExecution.id)
             const outcome = response.data || {}
@@ -340,10 +463,14 @@ const VibeFlowChatBot = () => {
         const previousHeight = container ? container.scrollHeight : 0
         await loadMessages(activeSessionId, { limit: MESSAGE_PAGE_SIZE, prepend: true })
         if (container) {
-            const delta = container.scrollHeight - previousHeight
-            container.scrollTop = container.scrollTop + delta
+            container.scrollTop = container.scrollTop + (container.scrollHeight - previousHeight)
         }
         setHasMore(false)
+    }
+
+    const handleTranscript = (text) => {
+        setInput((previous) => (previous.trim().length ? `${previous} ${text}` : text))
+        setNotice({ severity: 'success', text: 'Transcription added to the input, you can edit it before sending.' })
     }
 
     const workflowOptions = useMemo(
@@ -359,7 +486,6 @@ const VibeFlowChatBot = () => {
     return (
         <MainCard content={false} sx={{ height: 'calc(100vh - 120px)', overflow: 'hidden' }}>
             <Stack flexDirection='row' sx={{ height: '100%', minHeight: 0 }}>
-                {/* -------------------------- main zone -------------------------- */}
                 <Stack sx={{ flex: 1, minWidth: 0, height: '100%' }}>
                     {/* header */}
                     <Stack
@@ -383,6 +509,9 @@ const VibeFlowChatBot = () => {
                                     variant='outlined'
                                     label={workspaces.find((workspace) => workspace.id === activeSession.workspaceId)?.name || 'workspace'}
                                 />
+                            )}
+                            {capabilities?.speechToText?.available && (
+                                <Chip size='small' variant='outlined' color='primary' label={`STT: ${capabilities.speechToText.source}`} />
                             )}
                         </Stack>
                         <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 1 }}>
@@ -445,9 +574,9 @@ const VibeFlowChatBot = () => {
                                 <LinearProgress />
                                 <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
                                     <Typography variant='caption' color='text.secondary'>
-                                        Running the workflow… (Stop is available on the last request)
+                                        {streamingId ? 'Streaming the workflow answer…' : 'Running the workflow…'}
                                     </Typography>
-                                    <Button size='small' color='error' onClick={handleStop} disabled={!runningExecution?.id}>
+                                    <Button size='small' color='error' onClick={handleStop}>
                                         Stop
                                     </Button>
                                 </Stack>
@@ -456,7 +585,6 @@ const VibeFlowChatBot = () => {
                         <div ref={bottomRef} />
                     </Box>
 
-                    {/* notice */}
                     {notice && (
                         <Box sx={{ px: 2 }}>
                             <Alert severity={notice.severity} onClose={() => setNotice(null)} sx={{ mb: 1 }}>
@@ -465,45 +593,27 @@ const VibeFlowChatBot = () => {
                         </Box>
                     )}
 
-                    {/* input zone */}
-                    <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
-                        <Stack flexDirection='row' sx={{ gap: 1, alignItems: 'flex-end' }}>
-                            <TextField
-                                multiline
-                                maxRows={6}
-                                fullWidth
-                                size='small'
-                                placeholder='Write your request… (Enter to send, Shift+Enter for a new line)'
-                                value={input}
-                                onChange={(event) => setInput(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' && !event.shiftKey) {
-                                        event.preventDefault()
-                                        handleSend()
-                                    }
-                                }}
-                                disabled={sending}
-                            />
-                            <Tooltip title='Send'>
-                                <span>
-                                    <IconButton
-                                        color='primary'
-                                        onClick={handleSend}
-                                        disabled={sending || !input.trim().length}
-                                        sx={{ bgcolor: alpha(theme.palette.primary.main, 0.12), borderRadius: 2, p: 1.2 }}
-                                    >
-                                        {sending ? <CircularProgress size={18} /> : <IconSend size={18} />}
-                                    </IconButton>
-                                </span>
-                            </Tooltip>
-                        </Stack>
-                    </Box>
+                    <ComposerBar
+                        value={input}
+                        onChange={setInput}
+                        onSend={handleSend}
+                        onStop={handleStop}
+                        sending={sending}
+                        attachments={attachments}
+                        onAttachmentsChange={setAttachments}
+                        maxFileSizeBytes={capabilities?.uploads?.maxFileSizeBytes}
+                        speechToText={capabilities?.speechToText}
+                        workflowSelected={Boolean(selectedWorkflowId)}
+                        sessionId={activeSessionId}
+                        workflowId={selectedWorkflowId}
+                        onNotice={setNotice}
+                        onTranscript={handleTranscript}
+                    />
                 </Stack>
 
-                {/* --------------------- right sidebar --------------------- */}
                 {sidebarOpen && (
                     <>
-                        <Divider orientation='vertical' flexItem />
+                        <Box sx={{ borderLeft: 1, borderColor: 'divider' }} />
                         <SessionSidebar
                             sessions={sessions.filter(
                                 (session) => !search.trim().length || session.title.toLowerCase().includes(search.trim().toLowerCase())

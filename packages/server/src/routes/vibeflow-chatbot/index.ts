@@ -16,6 +16,7 @@ router.get('/browse', vibeflowChatBotController.browse)
 
 // Workflows that can be executed from the ChatBot (never a static list)
 router.get('/workflows', vibeflowChatBotController.getWorkflows)
+router.get('/workflows/:id/capabilities', vibeflowChatBotController.getWorkflowCapabilities)
 
 // Sessions
 router.get('/sessions', vibeflowChatBotController.getSessions)
@@ -33,6 +34,8 @@ router.get('/sessions/:id/context', vibeflowChatBotController.getContext)
 router.get('/sessions/:id/executions', vibeflowChatBotController.getExecutions)
 router.post('/sessions/:id/executions', vibeflowChatBotController.postExecution)
 router.post('/sessions/:id/execute', vibeflowChatBotController.executeWorkflow)
+router.post('/sessions/:id/execute/stream', vibeflowChatBotController.executeWorkflowStream)
+router.post('/sessions/:id/transcribe', vibeflowChatBotController.transcribeAudio)
 router.post('/sessions/:id/executions/:executionId/stop', vibeflowChatBotController.stopExecution)
 
 export default router

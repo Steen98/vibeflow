@@ -13,6 +13,8 @@ const browse = (path) => client.get('/vibeflow-chatbot/browse', { params: { path
 
 // Workflows available for execution (dynamic, never a static list)
 const getWorkflows = (search) => client.get('/vibeflow-chatbot/workflows', { params: { search } })
+const getWorkflowCapabilities = (id) => client.get(`/vibeflow-chatbot/workflows/${id}/capabilities`)
+const transcribe = (sessionId, body) => client.post(`/vibeflow-chatbot/sessions/${sessionId}/transcribe`, body)
 
 // Sessions
 const getSessions = (params) => client.get('/vibeflow-chatbot/sessions', { params })
@@ -44,9 +46,11 @@ export default {
     getSession,
     getSessions,
     getStats,
+    getWorkflowCapabilities,
     getWorkflows,
     getWorkspaces,
     stopExecution,
+    transcribe,
     updateSession,
     updateWorkspace
 }

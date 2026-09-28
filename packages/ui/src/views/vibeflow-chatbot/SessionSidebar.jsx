@@ -261,6 +261,16 @@ const SessionSidebar = ({
                             holds {monitoring.context.totalMessages})
                         </Typography>
                     )}
+                    {monitoring?.llm && (
+                        <Typography variant='caption' color='text.secondary' sx={{ display: 'block', lineHeight: 1.3 }}>
+                            Max context supported:{' '}
+                            {monitoring.llm.maxContextTokens
+                                ? `${monitoring.llm.maxContextTokens} tokens (declared by the workflow${
+                                      monitoring.llm.model ? ` · ${monitoring.llm.model}` : ''
+                                  })`
+                                : monitoring.llm.reason || 'not declared by the workflow'}
+                        </Typography>
+                    )}
                     <Gauge label={`CPU (${monitoring?.cpu?.cores ?? '?'} cores)`} value={monitoring?.cpu?.usagePercent} />
                     <Gauge label='RAM' value={monitoring?.memory?.usedPercent} reason='Memory usage unavailable on this host' />
                     {monitoring?.memory && (

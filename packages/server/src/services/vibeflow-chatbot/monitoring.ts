@@ -1,6 +1,8 @@
 import { execFile } from 'child_process'
 import os from 'os'
-import { buildSessionContext } from 'flowise-components'
+import { buildSessionContext, getSession } from 'flowise-components'
+import { ChatFlow } from '../../database/entities/ChatFlow'
+import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 
 /**
  * VibeFlow AI monitoring.
@@ -49,6 +51,15 @@ export interface IContextMetric {
     totalMessages: number
 }
 
+export interface ILlmContextMetric {
+    source: 'workflow' | 'unavailable'
+    model?: string
+    providerNode?: string
+    maxContextTokens?: number
+    declaredMaxTokens?: number
+    reason?: string
+}
+
 export interface IMonitoringSnapshot {
     collectedAt: string
     platform: string
@@ -57,6 +68,7 @@ export interface IMonitoringSnapshot {
     gpu: IGpuMetric
     providerBalance: IProviderBalanceMetric
     context?: IContextMetric
+    llm?: ILlmContextMetric
 }
 
 const sampleCpu = (): Promise<{ idle: number; total: number }> => {
@@ -237,8 +249,52 @@ const getContextMetric = (sessionId?: string): IContextMetric | undefined => {
     }
 }
 
+/**
+ * Maximum context supported: read from the workflow itself.
+ * The value is only reported when the workflow really declares it; otherwise the reason is
+ * returned instead of an estimation.
+ */
+const getWorkflowModelInfo = async (workflowId?: string): Promise<ILlmContextMetric> => {
+    if (!workflowId) return { source: 'unavailable', reason: 'No workflow bound to this session' }
+    try {
+        const appServer = getRunningExpressApp()
+        const flow = await appServer.AppDataSource.getRepository(ChatFlow).findOneBy({ id: workflowId })
+        if (!flow) return { source: 'unavailable', reason: 'Workflow not found' }
+
+        const flowData = typeof (flow as any).flowData === 'string' ? JSON.parse((flow as any).flowData) : (flow as any).flowData
+        const nodes = flowData?.nodes || []
+        const modelNode = nodes.find((node: any) => node?.data?.category === 'Chat Models')
+        if (!modelNode) return { source: 'unavailable', reason: 'This workflow does not expose a Chat Models node' }
+
+        const inputs = modelNode.data.inputs || {}
+        const model = inputs.modelName || inputs.model
+        const declaredMaxTokens = Number(inputs.maxTokens) || undefined
+        const declaredContextWindow = Number(inputs.maxContextTokens ?? inputs.contextWindow ?? inputs.contextLength) || undefined
+        if (!declaredContextWindow) {
+            return {
+                source: 'workflow',
+                model,
+                providerNode: modelNode.data.name,
+                declaredMaxTokens,
+                reason: 'The workflow does not declare a context window size'
+            }
+        }
+        return {
+            source: 'workflow',
+            model,
+            providerNode: modelNode.data.name,
+            declaredMaxTokens,
+            maxContextTokens: declaredContextWindow
+        }
+    } catch (error) {
+        return { source: 'unavailable', reason: error instanceof Error ? error.message : 'Unable to read the workflow model' }
+    }
+}
+
 export const collectMonitoring = async (sessionId?: string): Promise<IMonitoringSnapshot> => {
     const [cpu, gpu, providerBalance] = await Promise.all([getCpuMetric(), getGpuMetric(), getProviderBalanceMetric()])
+    const session = sessionId ? getSession(sessionId) : undefined
+    const llm = await getWorkflowModelInfo(session?.defaultWorkflowId)
     return {
         collectedAt: new Date().toISOString(),
         platform: `${os.type()} ${os.release()} (${process.platform}/${process.arch})`,
@@ -246,6 +302,7 @@ export const collectMonitoring = async (sessionId?: string): Promise<IMonitoring
         memory: getMemoryMetric(),
         gpu,
         providerBalance,
-        context: getContextMetric(sessionId)
+        context: getContextMetric(sessionId),
+        llm
     }
 }
