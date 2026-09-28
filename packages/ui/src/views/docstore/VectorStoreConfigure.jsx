@@ -12,6 +12,7 @@ import { Button, Stack, Grid, Box, Typography, IconButton, Stepper, Step, StepLa
 import MainCard from '@/ui-component/cards/MainCard'
 import ConfirmDialog from '@/ui-component/dialog/ConfirmDialog'
 import ComponentsListDialog from '@/views/docstore/ComponentsListDialog'
+import GraphKnowledgeConfig from '@/views/docstore/GraphKnowledgeConfig'
 import DocStoreInputHandler from '@/views/docstore/DocStoreInputHandler'
 import ViewHeader from '@/layout/MainLayout/ViewHeader'
 import { BackdropLoader } from '@/ui-component/loading/BackdropLoader'
@@ -44,7 +45,7 @@ import { initNode, showHideInputParams, getFileName } from '@/utils/genericHelpe
 import useNotifier from '@/utils/useNotifier'
 
 // const
-const steps = ['Embeddings', 'Vector Store', 'Record Manager']
+const steps = ['Embeddings', 'Vector Store', 'Record Manager', 'Graph Knowledge']
 
 const VectorStoreConfigure = () => {
     const navigate = useNavigate()
@@ -518,7 +519,7 @@ const VectorStoreConfigure = () => {
                                     isBackButton={true}
                                     search={false}
                                     title={getViewHeaderTitle()}
-                                    description='Configure Embeddings, Vector Store and Record Manager'
+                                    description='Configure Embeddings, Vector Store, Record Manager and Graph Knowledge'
                                     onBack={() => navigate(-1)}
                                 >
                                     {(Object.keys(selectedEmbeddingsProvider).length > 0 ||
@@ -939,6 +940,8 @@ const VectorStoreConfigure = () => {
                     </>
                 )}
             </MainCard>
+
+            <GraphKnowledgeConfig documentStoreId={storeId} />
 
             {showEmbeddingsListDialog && (
                 <ComponentsListDialog

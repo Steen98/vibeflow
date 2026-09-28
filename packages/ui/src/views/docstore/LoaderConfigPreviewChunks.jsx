@@ -26,6 +26,7 @@ import ExpandedChunkDialog from './ExpandedChunkDialog'
 
 // API
 import nodesApi from '@/api/nodes'
+import AdvancedDocumentProcessing from '@/views/docstore/AdvancedDocumentProcessing'
 import documentStoreApi from '@/api/documentstore'
 import documentsApi from '@/api/documentstore'
 
@@ -444,6 +445,7 @@ const LoaderConfigPreviewChunks = () => {
                                 </Box>
                             </Toolbar>
                         </Box>
+                        <AdvancedDocumentProcessing documentStoreId={storeId} />
                         <Box>
                             <Grid container spacing='2'>
                                 <Grid item xs={4} md={6} lg={6} sm={4}>

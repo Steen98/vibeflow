@@ -13,6 +13,7 @@ router.get('/:storeId/pipeline/paths', vibeflowDocStoreController.getPipelinePat
 
 // Knowledge graph access (visualisation, search, traversal, engines)
 router.get('/graph/engines', vibeflowDocStoreController.getGraphEngines)
+router.post('/graph/engines', vibeflowDocStoreController.getGraphEngines)
 router.get('/:storeId/graph', vibeflowDocStoreController.getStoreGraph)
 router.get('/:storeId/graph/search', vibeflowDocStoreController.searchStoreGraph)
 router.get('/:storeId/graph/traverse/:nodeId', vibeflowDocStoreController.traverseStoreGraph)
