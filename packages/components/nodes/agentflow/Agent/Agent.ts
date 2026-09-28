@@ -270,6 +270,29 @@ class Agent_Agentflow implements INode {
                 ]
             },
             {
+                label: 'MCP Servers',
+                name: 'agentMcpServers',
+                type: 'array',
+                description:
+                    'Model Context Protocol servers available to this agent (Serena, Playwright, Chrome DevTools, GitHub, Slack, PostgreSQL, Custom MCP, ...)',
+                optional: true,
+                array: [
+                    {
+                        label: 'MCP Server',
+                        name: 'agentSelectedMcpServer',
+                        type: 'asyncOptions',
+                        loadMethod: 'listMcpServers',
+                        loadConfig: true
+                    },
+                    {
+                        label: 'Require Human Input',
+                        name: 'agentSelectedMcpServerRequiresHumanInput',
+                        type: 'boolean',
+                        optional: true
+                    }
+                ]
+            },
+            {
                 label: 'Knowledge (Document Stores)',
                 name: 'agentKnowledgeDocumentStores',
                 type: 'array',
@@ -615,13 +638,35 @@ class Agent_Agentflow implements INode {
             const returnOptions: INodeOptionsValue[] = []
             for (const nodeName in componentNodes) {
                 const componentNode = componentNodes[nodeName]
-                if (componentNode.category === 'Tools' || componentNode.category === 'Tools (MCP)') {
+                // VibeFlow: MCP servers have their own "MCP Servers" input below, they are no longer
+                // listed in the generic "Tools" dropdown.
+                if (componentNode.category === 'Tools') {
                     if (componentNode.tags?.includes('LlamaIndex')) {
                         continue
                     }
                     if (removeTools.includes(nodeName)) {
                         continue
                     }
+                    returnOptions.push({
+                        label: componentNode.label,
+                        name: nodeName,
+                        imageSrc: componentNode.icon
+                    })
+                }
+            }
+            return returnOptions
+        },
+        async listMcpServers(_: INodeData, options: ICommonObject): Promise<INodeOptionsValue[]> {
+            // VibeFlow: Model Context Protocol servers are selectable from the dedicated
+            // "MCP Servers" input of the Agent node.
+            const componentNodes = options.componentNodes as {
+                [key: string]: INode
+            }
+
+            const returnOptions: INodeOptionsValue[] = []
+            for (const nodeName in componentNodes) {
+                const componentNode = componentNodes[nodeName]
+                if (componentNode.category === 'Tools (MCP)' || componentNode.category === 'MCP Servers') {
                     returnOptions.push({
                         label: componentNode.label,
                         name: nodeName,
@@ -702,8 +747,21 @@ class Agent_Agentflow implements INode {
             // Extract tools
             const tools = nodeData.inputs?.agentTools as ITool[]
 
+            // VibeFlow: MCP servers are picked from their own "MCP Servers" input. Both inputs feed the
+            // same tool instances, so an MCP server behaves exactly like a regular tool at runtime.
+            const mcpServers = (nodeData.inputs?.agentMcpServers as any[]) || []
+            const selectedTools = [
+                ...(tools || []),
+                ...mcpServers.map((server) => ({
+                    ...server,
+                    agentSelectedTool: server?.agentSelectedMcpServer,
+                    agentSelectedToolConfig: server?.agentSelectedMcpServerConfig,
+                    agentSelectedToolRequiresHumanInput: server?.agentSelectedMcpServerRequiresHumanInput
+                }))
+            ].filter((selected) => Boolean(selected?.agentSelectedTool))
+
             const toolsInstance: Tool[] = []
-            for (const tool of tools) {
+            for (const tool of selectedTools) {
                 const toolConfig = tool.agentSelectedToolConfig
                 const nodeInstanceFilePath = options.componentNodes[tool.agentSelectedTool].filePath as string
                 const nodeModule = await import(nodeInstanceFilePath)
