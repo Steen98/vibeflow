@@ -104,6 +104,8 @@ export class GraphologyLocalAdapter implements IGraphKnowledgeAdapter {
     readonly documentStoreId: string
     private graph: MultiDirectedGraph
     private storageDir: string
+    /** name (lowercase) -> node id, so a relation referencing an entity by name reuses the entity node */
+    private nameIndex: Map<string, string> = new Map()
 
     constructor(documentStoreId: string, options: { storageDir?: string } = {}) {
         if (!documentStoreId || !documentStoreId.trim().length) throw new Error('documentStoreId is required')
@@ -111,6 +113,33 @@ export class GraphologyLocalAdapter implements IGraphKnowledgeAdapter {
         this.storageDir = options.storageDir || path.join(getGraphRoot(), String(documentStoreId).replace(/[^a-zA-Z0-9._-]/g, '_'))
         this.graph = new MultiDirectedGraph()
         this.load()
+    }
+
+    private rebuildNameIndex(): void {
+        this.nameIndex = new Map()
+        this.graph.forEachNode((id, attributes) => {
+            const name = String((attributes as any).name || '')
+                .trim()
+                .toLowerCase()
+            if (name.length && !this.nameIndex.has(name)) this.nameIndex.set(name, id)
+        })
+    }
+
+    /**
+     * Resolve an entity reference to an existing node id: exact id, then entity name,
+     * otherwise a new id is created. This prevents the graph from fragmenting into
+     * duplicated nodes when a relation references an entity by its name.
+     */
+    private resolveNodeId(reference: string): string {
+        const normalized = normalizeEntityId(reference)
+        if (this.graph.hasNode(normalized)) return normalized
+        const byName = this.nameIndex.get(
+            String(reference || '')
+                .trim()
+                .toLowerCase()
+        )
+        if (byName && this.graph.hasNode(byName)) return byName
+        return normalized
     }
 
     private get filePath(): string {
@@ -134,6 +163,7 @@ export class GraphologyLocalAdapter implements IGraphKnowledgeAdapter {
         } catch {
             this.graph = new MultiDirectedGraph()
         }
+        this.rebuildNameIndex()
     }
 
     private persist(): void {
@@ -155,11 +185,13 @@ export class GraphologyLocalAdapter implements IGraphKnowledgeAdapter {
 
     async createGraph(): Promise<void> {
         this.graph = new MultiDirectedGraph()
+        this.nameIndex = new Map()
         this.persist()
     }
 
     async deleteGraph(): Promise<void> {
         this.graph = new MultiDirectedGraph()
+        this.nameIndex = new Map()
         if (existsSync(this.storageDir)) rmSync(this.storageDir, { recursive: true, force: true })
     }
 
@@ -179,12 +211,13 @@ export class GraphologyLocalAdapter implements IGraphKnowledgeAdapter {
         }
         if (this.graph.hasNode(id)) this.graph.mergeNodeAttributes(id, attributes)
         else this.graph.addNode(id, attributes)
+        if (attributes.name) this.nameIndex.set(String(attributes.name).trim().toLowerCase(), id)
         return id
     }
 
     private upsertRelation(relation: IGraphRelation): string {
-        const source = normalizeEntityId(relation.source)
-        const target = normalizeEntityId(relation.target)
+        const source = this.resolveNodeId(relation.source)
+        const target = this.resolveNodeId(relation.target)
         const type = relation.type || 'RELATED_TO'
         if (!this.graph.hasNode(source)) this.graph.addNode(source, { name: relation.source, type: 'Concept' })
         if (!this.graph.hasNode(target)) this.graph.addNode(target, { name: relation.target, type: 'Concept' })

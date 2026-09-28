@@ -13,6 +13,7 @@ import MainCard from '@/ui-component/cards/MainCard'
 import ConfirmDialog from '@/ui-component/dialog/ConfirmDialog'
 import ComponentsListDialog from '@/views/docstore/ComponentsListDialog'
 import GraphKnowledgeConfig from '@/views/docstore/GraphKnowledgeConfig'
+import KnowledgeGraphView from '@/views/docstore/KnowledgeGraphView'
 import DocStoreInputHandler from '@/views/docstore/DocStoreInputHandler'
 import ViewHeader from '@/layout/MainLayout/ViewHeader'
 import { BackdropLoader } from '@/ui-component/loading/BackdropLoader'
@@ -73,6 +74,7 @@ const VectorStoreConfigure = () => {
     const [currentLoader, setCurrentLoader] = useState(null)
 
     const [showEmbeddingsListDialog, setShowEmbeddingsListDialog] = useState(false)
+    const [graphViewer, setGraphViewer] = useState({ show: false, engine: 'graphology-local' })
     const [selectedEmbeddingsProvider, setSelectedEmbeddingsProvider] = useState({})
 
     const [showVectorStoreListDialog, setShowVectorStoreListDialog] = useState(false)
@@ -941,7 +943,14 @@ const VectorStoreConfigure = () => {
                 )}
             </MainCard>
 
-            <GraphKnowledgeConfig documentStoreId={storeId} />
+            <GraphKnowledgeConfig documentStoreId={storeId} onViewGraph={({ engine }) => setGraphViewer({ show: true, engine })} />
+
+            <KnowledgeGraphView
+                show={graphViewer.show}
+                documentStoreId={storeId}
+                engine={graphViewer.engine}
+                onCancel={() => setGraphViewer({ show: false })}
+            />
 
             {showEmbeddingsListDialog && (
                 <ComponentsListDialog
