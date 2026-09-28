@@ -467,7 +467,7 @@ const ShareChatbot = ({ isSessionMemory, isAgentCanvas }) => {
                 <Stack sx={{ mt: 1, mb: 2, alignItems: 'center' }} direction='row' spacing={2}>
                     <Typography variant='h4'>Title Settings</Typography>
                 </Stack>
-                {textField(title, 'title', 'Title', 'string', 'Flowise Assistant')}
+                {textField(title, 'title', 'Title', 'string', 'VibeFlow Assistant')}
                 {textField(
                     titleAvatarSrc,
                     'titleAvatarSrc',

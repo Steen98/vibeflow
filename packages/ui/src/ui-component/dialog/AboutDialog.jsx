@@ -45,7 +45,7 @@ const AboutDialog = ({ show, onCancel }) => {
             aria-describedby='alert-dialog-description'
         >
             <DialogTitle sx={{ fontSize: '1rem' }} id='alert-dialog-title'>
-                Flowise Version
+                VibeFlow Version
             </DialogTitle>
             <DialogContent>
                 {data && (
@@ -54,7 +54,7 @@ const AboutDialog = ({ show, onCancel }) => {
                             <TableHead>
                                 <TableRow>
                                     <TableCell>Current Version</TableCell>
-                                    <TableCell>Latest Version</TableCell>
+                                    <TableCell>Latest Upstream Version</TableCell>
                                     <TableCell>Published At</TableCell>
                                 </TableRow>
                             </TableHead>

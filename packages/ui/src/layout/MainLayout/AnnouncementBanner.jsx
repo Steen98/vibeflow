@@ -21,9 +21,9 @@ const AnnouncementBanner = ({ onClose }) => (
             '& .MuiAlert-action': { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', p: 0 }
         }}
     >
-        We&apos;re sunsetting Flowise.{' '}
-        <Link href='https://flowiseai.com/sunset' target='_blank' rel='noopener noreferrer'>
-            Learn more
+        VibeFlow is an open source fork of Flowise, maintained independently.{' '}
+        <Link href='https://github.com/FlowiseAI/Flowise' target='_blank' rel='noopener noreferrer'>
+            Upstream project
         </Link>
     </Alert>
 )

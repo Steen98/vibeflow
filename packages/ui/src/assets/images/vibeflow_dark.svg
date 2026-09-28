@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="480" height="120" role="img" aria-label="VibeFlow">
+    <defs>
+        <linearGradient id="vibeflowMarkDark" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#1565c0" />
+            <stop offset="1" stop-color="#2296f3" />
+        </linearGradient>
+    </defs>
+    <rect x="4" y="4" width="112" height="112" rx="30" fill="url(#vibeflowMarkDark)" />
+    <path d="M32 34 L60 84 L88 34" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="60" cy="84" r="8" fill="#ffffff" />
+    <text
+        x="146"
+        y="80"
+        font-family="Poppins, Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="56"
+        font-weight="600"
+        fill="#1a1a2e"
+    >
+        Vibe<tspan fill="#2296f3">Flow</tspan>
+    </text>
+</svg>

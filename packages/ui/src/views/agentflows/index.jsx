@@ -47,7 +47,8 @@ const Agentflows = () => {
 
     const getAllAgentflows = useApi(chatflowsApi.getAllAgentflows)
     const [view, setView] = useState(localStorage.getItem('agentFlowDisplayStyle') || 'card')
-    const [agentflowVersion, setAgentflowVersion] = useState(localStorage.getItem('agentFlowVersion') || 'v2')
+    // VibeFlow: AgentFlow V1 is no longer exposed in the UI — V2 is the only version available.
+    const [agentflowVersion] = useState('v2')
     const [showDeprecationNotice, setShowDeprecationNotice] = useState(true)
 
     /* Table Pagination */
@@ -77,9 +78,9 @@ const Agentflows = () => {
     }
 
     const handleVersionChange = (event, nextView) => {
-        if (nextView === null) return
+        // VibeFlow: V1 is no longer selectable
+        if (nextView === null || nextView === 'v1') return
         localStorage.setItem('agentFlowVersion', nextView)
-        setAgentflowVersion(nextView)
         refresh(1, pageLimit, nextView)
     }
 
@@ -242,18 +243,6 @@ const Agentflows = () => {
                             >
                                 <Chip sx={{ mr: 1 }} label='NEW' size='small' color='primary' />
                                 V2
-                            </ToggleButton>
-                            <ToggleButton
-                                sx={{
-                                    borderColor: theme.palette.grey[900] + 25,
-                                    borderRadius: 2,
-                                    color: customization.isDarkMode ? 'white' : 'inherit'
-                                }}
-                                variant='contained'
-                                value='v1'
-                                title='V1'
-                            >
-                                V1
                             </ToggleButton>
                         </ToggleButtonGroup>
                         <ToggleButtonGroup

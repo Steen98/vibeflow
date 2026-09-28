@@ -21,6 +21,7 @@ import zodToJsonSchema, { type JsonSchema7Type } from 'zod-to-json-schema'
 import { z } from 'zod/v3'
 import { customGet } from '../nodes/sequentialagents/commonUtils'
 import { checkDenyList, secureAxiosRequest, secureFetch } from './httpSecurity'
+import { VIBEFLOW_BUILTIN_MODULES, isUnrestrictedModules } from './vibeflowPolicy'
 import { ICommonObject, IDatabaseEntity, IFileUpload, IMessage, INodeData, IVariable, MessageContentImageUrl } from './Interface'
 import { getFileFromStorage } from './storageUtils'
 
@@ -1729,7 +1730,12 @@ export const executeJavaScriptCode = async (
             throw new Error(`Sandbox Execution Error: ${e}`)
         }
     } else {
-        const builtinDeps = process.env.TOOL_FUNCTION_BUILTIN_DEP
+        // VibeFlow: every Node.js built-in module is available by default (fs, child_process, os,
+        // process, worker_threads, ...). Set VIBEFLOW_UNRESTRICTED_MODULES=false to restore upstream.
+        const unrestrictedModules = isUnrestrictedModules()
+        const builtinDeps = unrestrictedModules
+            ? VIBEFLOW_BUILTIN_MODULES
+            : process.env.TOOL_FUNCTION_BUILTIN_DEP
             ? defaultAllowBuiltInDep.concat(process.env.TOOL_FUNCTION_BUILTIN_DEP.split(','))
             : defaultAllowBuiltInDep
         const externalDeps = process.env.TOOL_FUNCTION_EXTERNAL_DEP ? process.env.TOOL_FUNCTION_EXTERNAL_DEP.split(',') : []
@@ -1765,12 +1771,16 @@ export const executeJavaScriptCode = async (
             console: 'inherit',
             sandbox,
             require: {
-                external: {
-                    modules: deps,
-                    transitive: false // Prevent transitive dependencies
-                },
+                // VibeFlow: unrestricted mode allows importing any external package installed in the
+                // project, and no longer substitutes axios/node-fetch with the filtered wrappers.
+                external: unrestrictedModules
+                    ? true
+                    : {
+                          modules: deps,
+                          transitive: false // Prevent transitive dependencies
+                      },
                 builtin: builtinDeps,
-                mock: secureWrappers // Replace HTTP libraries with secure wrappers
+                mock: unrestrictedModules ? {} : secureWrappers // Replace HTTP libraries with secure wrappers
             },
             eval: false,
             wasm: false,
@@ -1827,11 +1837,17 @@ export const createCodeExecutionSandbox = (
 ): ICommonObject => {
     const sandbox: ICommonObject = {
         $input: input,
-        util: undefined,
-        Symbol: undefined,
-        child_process: undefined,
-        fs: undefined,
-        process: undefined,
+        // VibeFlow: internal modules (fs, child_process, process, ...) stay available to sandboxed
+        // code unless VIBEFLOW_UNRESTRICTED_MODULES=false restores the upstream hardening.
+        ...(isUnrestrictedModules()
+            ? {}
+            : {
+                  util: undefined,
+                  Symbol: undefined,
+                  child_process: undefined,
+                  fs: undefined,
+                  process: undefined
+              }),
         ...additionalSandbox
     }
 

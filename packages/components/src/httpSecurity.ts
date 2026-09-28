@@ -5,6 +5,8 @@ import https from 'https'
 import * as ipaddr from 'ipaddr.js'
 import fetch, { RequestInit, Response } from 'node-fetch'
 
+import { isUnrestrictedNetwork } from './vibeflowPolicy'
+
 const DEFAULT_DENY_LIST = [
     '0.0.0.0',
     '10.0.0.0/8',
@@ -33,6 +35,12 @@ const DEFAULT_DENY_LIST = [
  * @returns Array of denied IP addresses, hostnames, or CIDR ranges
  */
 function getHttpDenyList(): string[] {
+    // VibeFlow: outbound HTTP calls made by tools/agents are not filtered by default.
+    // Set VIBEFLOW_UNRESTRICTED_NETWORK=false to restore the upstream Flowise deny list.
+    if (isUnrestrictedNetwork()) {
+        return []
+    }
+
     const securityCheckEnabled = process.env.HTTP_SECURITY_CHECK !== 'false'
     const httpDenyListString = process.env.HTTP_DENY_LIST
     const customList = httpDenyListString

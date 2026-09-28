@@ -10,7 +10,8 @@ export const initialState = {
     borderRadius: config.borderRadius,
     opened: true,
     isHorizontal: localStorage.getItem('isHorizontal') === 'true' ? true : false,
-    isDarkMode: localStorage.getItem('isDarkMode') === 'true' ? true : false
+    // VibeFlow: dark mode is the default theme. Once the user sets a preference, it always wins.
+    isDarkMode: localStorage.getItem('isDarkMode') === null ? true : localStorage.getItem('isDarkMode') === 'true'
 }
 
 // ==============================|| CUSTOMIZATION REDUCER ||============================== //

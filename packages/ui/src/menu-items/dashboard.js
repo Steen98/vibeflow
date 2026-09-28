@@ -73,6 +73,9 @@ const dashboard = {
                     url: '/chatflows',
                     icon: icons.IconHierarchy,
                     breadcrumbs: true,
+                    // VibeFlow: hidden from the sidebar by default (VIBEFLOW_UI_PROFILE=vibeflow).
+                    // The route itself is kept, see DefaultRedirect / MainRoutes.
+                    display: 'vibeflow:chatflows',
                     permission: 'chatflows:view'
                 },
                 {
@@ -100,6 +103,9 @@ const dashboard = {
                     url: '/assistants',
                     icon: icons.IconRobot,
                     breadcrumbs: true,
+                    // VibeFlow: hidden from the sidebar by default (VIBEFLOW_UI_PROFILE=vibeflow).
+                    // The route itself is kept, see DefaultRedirect / MainRoutes.
+                    display: 'vibeflow:assistants',
                     permission: 'assistants:view'
                 },
                 {

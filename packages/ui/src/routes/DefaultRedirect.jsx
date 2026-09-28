@@ -38,10 +38,10 @@ export const DefaultRedirect = () => {
 
     // Define the order of routes to check (based on the menu order in dashboard.js)
     const routesToCheck = [
-        { component: Chatflows, permission: 'chatflows:view' },
+        { component: Chatflows, permission: 'chatflows:view', display: 'vibeflow:chatflows' },
         { component: Agentflows, permission: 'agentflows:view' },
         { component: Executions, permission: 'executions:view' },
-        { component: Assistants, permission: 'assistants:view' },
+        { component: Assistants, permission: 'assistants:view', display: 'vibeflow:assistants' },
         { component: Marketplaces, permission: 'templates:marketplace,templates:custom' },
         { component: Tools, permission: 'tools:view' },
         { component: Credentials, permission: 'credentials:view' },
@@ -68,14 +68,16 @@ export const DefaultRedirect = () => {
         return <Login />
     }
 
-    // For open source, show chatflows (no permission checks)
-    if (isOpenSource) {
-        return <Chatflows />
-    }
-
-    // For global admins, show chatflows (they have access to everything)
-    if (isGlobal) {
-        return <Chatflows />
+    // VibeFlow: Chatflows is hidden from the sidebar, so open source users and global admins land
+    // on the first entry that is actually visible instead of the (now hidden) Chatflows page.
+    if (isOpenSource || isGlobal) {
+        for (const route of routesToCheck) {
+            if (!route.display || hasDisplay(route.display)) {
+                const Component = route.component
+                return <Component />
+            }
+        }
+        return <Unauthorized />
     }
 
     // Check each route in order and return the first accessible component
