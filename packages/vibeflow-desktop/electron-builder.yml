@@ -25,6 +25,10 @@ win:
           arch:
               - x64
     artifactName: VibeFlow-Setup-${version}-${arch}.${ext}
+    # Skipping the executable signing/editing step avoids requiring the winCodeSign tools, whose
+    # extraction needs symbolic-link privileges on Windows (Developer Mode or administrator).
+    # The produced installer therefore keeps the default Electron icon and metadata.
+    signAndEditExecutable: false
 
 nsis:
     oneClick: false

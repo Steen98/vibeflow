@@ -8,18 +8,18 @@
 >
 > What this fork adds on top of Flowise:
 >
-> - a conversational execution layer, the **ChatBot** (sessions, workspaces bound to a host working
->   directory, attachments, voice input with a Speech-to-Text adapter, SSE streaming, retry/stop,
->   and real AI monitoring: CPU/RAM/GPU, provider balance, context usage);
-> - **hybrid Document Stores**: a vector store *and* its knowledge graph, created/versioned/deleted
->   together, with an Advanced Document Processing pipeline (fractionator ≤ 3 pages, cleaner,
->   temporary Markdown backups, optional summary), an enriched table and an interactive graph viewer;
-> - a **hybrid retrieval pipeline** (prompt optimisation, axis decomposition, variants, semantic +
->   BM25 + graph retrievers, RRF fusion, reranking, top-K ≤ 50) with a **Test RAG** interface that
->   shows every step and the full provenance chain;
-> - **8 native tools** (READ, WRITE, EDIT, DELETE, LS, GREP, BASH, GIT), **3 native MCP servers**
->   (Serena, Playwright, Chrome DevTools), a dedicated **MCP Servers** section in the Agent node and
->   a **Skills** registry (`.zip` / `.skill` import, `SKILL.md` format).
+> -   a conversational execution layer, the **ChatBot** (sessions, workspaces bound to a host working
+>     directory, attachments, voice input with a Speech-to-Text adapter, SSE streaming, retry/stop,
+>     and real AI monitoring: CPU/RAM/GPU, provider balance, context usage);
+> -   **hybrid Document Stores**: a vector store _and_ its knowledge graph, created/versioned/deleted
+>     together, with an Advanced Document Processing pipeline (fractionator ≤ 3 pages, cleaner,
+>     temporary Markdown backups, optional summary), an enriched table and an interactive graph viewer;
+> -   a **hybrid retrieval pipeline** (prompt optimisation, axis decomposition, variants, semantic +
+>     BM25 + graph retrievers, RRF fusion, reranking, top-K ≤ 50) with a **Test RAG** interface that
+>     shows every step and the full provenance chain;
+> -   **8 native tools** (READ, WRITE, EDIT, DELETE, LS, GREP, BASH, GIT), **3 native MCP servers**
+>     (Serena, Playwright, Chrome DevTools), a dedicated **MCP Servers** section in the Agent node and
+>     a **Skills** registry (`.zip` / `.skill` import, `SKILL.md` format).
 >
 > Module/network restrictions applied to AI agents and Custom Tools are lifted by default
 > (`VIBEFLOW_UNRESTRICTED_MODULES`, `VIBEFLOW_UNRESTRICTED_NETWORK`). Set them to `false` to restore
@@ -79,7 +79,70 @@
 >
 > (or set `ELECTRON_MIRROR` to a local mirror). Electron downloads ~100 MB from GitHub releases
 > during `npm install`, which is the only step that needs network access.
-
+>
+> ### Windows installer — result obtained in this repository
+>
+> Built and verified here: `packages/vibeflow-desktop/dist/VibeFlow-Setup-3.1.4-x64.exe`
+> (79.9 MB, PE signature `MZ`, SHA-256 `ABBED4E2CE596B835CDFD3194205462925A4ED0BA6D78E48A3675B659DF90881`).
+>
+> Exact steps used:
+>
+> 1. `cd packages/vibeflow-desktop`
+> 2. `pnpm install` (npm stalled on this machine; pnpm reused the warm store and finished in ~10 min)
+> 3. `node node_modules/electron/install.js` (downloads the 115 MB Electron runtime from GitHub releases)
+> 4. `npx electron-builder --win --x64`
+>
+> `signAndEditExecutable: false` is set in `electron-builder.yml` because extracting the `winCodeSign`
+> tools needs symbolic-link privileges on Windows (Developer Mode or an administrator account); the
+> installer therefore keeps the default Electron icon. Remove that line when the build runs with the
+> required privileges and the custom icon/metadata is wanted. Signing is skipped when no certificate
+> is configured (`no signing info identified, signing is skipped`).
+>
+> ### macOS — `.dmg`, step by step (run on a Mac)
+>
+> 1. Install the toolchain: `xcode-select --install`, then Node 24 and pnpm (`brew install node pnpm`).
+> 2. Clone the fork and build the application itself:
+>    `git clone <your-fork-url> vibeflow && cd vibeflow && pnpm install && pnpm build`
+>    (this builds `packages/server` and `packages/ui`; the desktop shell starts that server).
+> 3. Build the desktop shell: `cd packages/vibeflow-desktop && pnpm install`
+> 4. Fetch the Electron runtime if the postinstall was skipped:
+>    `node node_modules/electron/install.js`
+>    If GitHub is slow or blocked: `export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` first.
+> 5. Produce the `.dmg`: `pnpm exec electron-builder --mac`
+>    (both architectures: `pnpm exec electron-builder --mac --x64 --arm64`).
+> 6. Expected output: `packages/vibeflow-desktop/dist/VibeFlow-3.1.4-<arch>.dmg`.
+> 7. Optional signing/notarisation: provide `CSC_LINK` + `CSC_KEY_PASSWORD` (Developer ID Application
+>    certificate) and `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID` for notarisation.
+>    Without them the `.dmg` is unsigned and Gatekeeper shows "unidentified developer"
+>    (right-click → Open to launch it).
+> 8. A `.dmg` cannot be produced from Windows or Linux: use a Mac or a macOS CI runner
+>    (`runs-on: macos-latest`).
+>
+> ### Linux — `.deb` and `.AppImage`, step by step (run on Linux)
+>
+> 1. Install the packaging tools used by electron-builder:
+>    `sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg libarchive-tools`
+>    (Fedora: `sudo dnf install -y rpm-build fakeroot dpkg`).
+> 2. Clone and build the application:
+>    `git clone <your-fork-url> vibeflow && cd vibeflow && pnpm install && pnpm build`
+> 3. Build the desktop shell: `cd packages/vibeflow-desktop && pnpm install`
+> 4. Fetch the Electron runtime if needed: `node node_modules/electron/install.js`
+>    (mirror alternative: `export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`).
+> 5. Produce both targets: `pnpm exec electron-builder --linux --x64`
+>    (one at a time: `pnpm exec electron-builder --linux AppImage` or `--linux deb`).
+> 6. Expected outputs:
+>     - `packages/vibeflow-desktop/dist/VibeFlow-3.1.4-x64.AppImage` → `chmod +x` then run it directly;
+>     - `packages/vibeflow-desktop/dist/VibeFlow-3.1.4-amd64.deb` → `sudo dpkg -i <file>`
+>       (or `sudo apt install ./<file>`).
+> 7. On a minimal distribution the AppImage may need FUSE: `sudo apt-get install -y libfuse2`.
+> 8. Both targets require a Linux host (or `runs-on: ubuntu-latest`); they cannot be produced from Windows.
+>
+> ### Optional CI matrix
+>
+> A single GitHub Actions workflow with
+> `strategy: matrix: os: [windows-latest, ubuntu-latest, macos-latest]` and the matching
+> `pnpm exec electron-builder --win` / `--linux` / `--mac` step produces all four artifacts
+> (`.exe`, `.deb`, `.AppImage`, `.dmg`) without keeping the three machines locally.
 
 <p align="center">
 <img src="https://github.com/FlowiseAI/Flowise/blob/main/images/flowise_white.svg#gh-light-mode-only">
