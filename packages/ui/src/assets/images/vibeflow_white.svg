@@ -14,7 +14,7 @@
         font-family="Poppins, Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         font-size="56"
         font-weight="600"
-        fill="#ffffff"
+        fill="#1a1a2e"
     >
         Vibe<tspan fill="#4fc3f7">Flow</tspan>
     </text>
