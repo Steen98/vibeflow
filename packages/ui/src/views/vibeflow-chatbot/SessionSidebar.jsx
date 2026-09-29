@@ -126,187 +126,188 @@ const SessionSidebar = ({
     const workflowName = (workflowId) => workflows.find((workflow) => workflow.id === workflowId)?.name || ''
 
     return (
-        <Box sx={{ width: 330, minWidth: 330, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, p: 1.5 }}>
+        <Box sx={{ width: 340, minWidth: 340, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.25, p: 1.5 }}>
             <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant='subtitle2'>Sessions</Typography>
+                <Typography variant='subtitle1' sx={{ fontWeight: 600 }}>
+                    Conversations
+                </Typography>
                 <Stack flexDirection='row' sx={{ gap: 0.5 }}>
                     <Tooltip title='Refresh monitoring'>
-                        <IconButton size='small' onClick={onRefreshMonitoring}>
+                        <IconButton size='small' onClick={onRefreshMonitoring} aria-label='refresh monitoring'>
                             <IconRefresh size={16} />
                         </IconButton>
                     </Tooltip>
                     <Tooltip title='Hide sidebar'>
-                        <IconButton size='small' onClick={onCollapse}>
+                        <IconButton size='small' onClick={onCollapse} aria-label='hide sidebar'>
                             <IconLayoutSidebarRightCollapse size={16} />
                         </IconButton>
                     </Tooltip>
                 </Stack>
             </Stack>
 
-            <Button variant='contained' startIcon={<IconPlus size={16} />} sx={{ borderRadius: 2 }} onClick={onNewSession}>
-                New Session
-            </Button>
+            <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5, pr: 0.25 }}>
+                <Button variant='contained' startIcon={<IconPlus size={16} />} sx={{ borderRadius: 2 }} onClick={onNewSession}>
+                    New Session
+                </Button>
 
-            <Stack flexDirection='row' sx={{ gap: 1, alignItems: 'center' }}>
-                <OutlinedInput
-                    size='small'
-                    fullWidth
-                    placeholder='Search sessions'
-                    value={search}
-                    onChange={(event) => onSearchChange(event.target.value)}
-                />
-            </Stack>
-
-            {/* Workspace of the active session */}
-            <Box>
-                <Typography variant='caption' color='text.secondary'>
-                    Workspace
-                </Typography>
-                <Stack flexDirection='row' sx={{ gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {workspaces.map((workspace) => (
-                        <Chip
-                            key={workspace.id}
-                            size='small'
-                            icon={<IconFolder size={14} />}
-                            label={workspace.name}
-                            color={activeSessionId && activeWorkspaceId === workspace.id ? 'primary' : 'default'}
-                            variant='outlined'
-                            onClick={() => onAssignWorkspace(workspace.id)}
-                        />
-                    ))}
-                    <Chip
+                <Stack flexDirection='row' sx={{ gap: 1, alignItems: 'center' }}>
+                    <OutlinedInput
                         size='small'
-                        variant='outlined'
-                        label='New workspace'
-                        icon={<IconPlus size={14} />}
-                        onClick={() => setWorkspaceDialog(true)}
+                        fullWidth
+                        placeholder='Search sessions'
+                        value={search}
+                        onChange={(event) => onSearchChange(event.target.value)}
                     />
                 </Stack>
-            </Box>
 
-            <Divider />
-
-            <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 120 }}>
-                {sessions.length === 0 && (
+                {/* Workspace of the active session */}
+                <Box>
                     <Typography variant='caption' color='text.secondary'>
-                        No session yet. Create one to start a conversation.
+                        Workspace
                     </Typography>
-                )}
-                <List dense disablePadding>
-                    {sessions.map((session) => (
-                        <ListItemButton
-                            key={session.id}
-                            selected={session.id === activeSessionId}
-                            onClick={() => onSelectSession(session.id)}
-                            sx={{ borderRadius: 2, alignItems: 'flex-start' }}
-                        >
-                            <ListItemText
-                                primary={
-                                    <Typography variant='body2' sx={{ fontWeight: session.id === activeSessionId ? 600 : 400 }}>
-                                        {session.title}
-                                    </Typography>
-                                }
-                                secondary={
-                                    <Typography variant='caption' color='text.secondary' component='span'>
-                                        {workflowName(session.defaultWorkflowId) || 'no default workflow'} · {session.messageCount} msg ·{' '}
-                                        {new Date(session.lastActivityAt).toLocaleString()}
-                                        {session.workspaceId
-                                            ? ` · ${workspaces.find((w) => w.id === session.workspaceId)?.name || ''}`
-                                            : ''}
-                                    </Typography>
-                                }
+                    <Stack flexDirection='row' sx={{ gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {workspaces.map((workspace) => (
+                            <Chip
+                                key={workspace.id}
+                                size='small'
+                                icon={<IconFolder size={14} />}
+                                label={workspace.name}
+                                color={activeSessionId && activeWorkspaceId === workspace.id ? 'primary' : 'default'}
+                                variant='outlined'
+                                onClick={() => onAssignWorkspace(workspace.id)}
                             />
-                            <Stack flexDirection='row' sx={{ gap: 0 }}>
-                                <Tooltip title='Rename'>
-                                    <IconButton
-                                        size='small'
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            onRenameSession(session)
-                                        }}
-                                    >
-                                        <IconPencil size={14} />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title='Delete'>
-                                    <IconButton
-                                        size='small'
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            onDeleteSession(session)
-                                        }}
-                                    >
-                                        <IconTrash size={14} />
-                                    </IconButton>
-                                </Tooltip>
-                            </Stack>
-                        </ListItemButton>
-                    ))}
-                </List>
-            </Box>
+                        ))}
+                        <Chip
+                            size='small'
+                            variant='outlined'
+                            label='New workspace'
+                            icon={<IconPlus size={14} />}
+                            onClick={() => setWorkspaceDialog(true)}
+                        />
+                    </Stack>
+                </Box>
 
-            <Divider />
+                <Divider />
 
-            {/* AI monitoring */}
-            <Box>
-                <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant='subtitle2'>AI Monitoring</Typography>
-                    {monitoringLoading && <CircularProgress size={12} />}
-                </Stack>
-                <Stack sx={{ gap: 1, mt: 1 }}>
-                    <Gauge label='Context usage' value={monitoring?.context?.usedPercent} reason='No active session context' />
-                    {monitoring?.context && (
+                <Box sx={{ minHeight: 120 }}>
+                    {sessions.length === 0 && (
                         <Typography variant='caption' color='text.secondary'>
-                            {monitoring.context.usedMessages} / {monitoring.context.windowMessages} messages of the context window (session
-                            holds {monitoring.context.totalMessages})
+                            No session yet. Create one to start a conversation.
                         </Typography>
                     )}
-                    {monitoring?.llm && (
-                        <Typography variant='caption' color='text.secondary' sx={{ display: 'block', lineHeight: 1.3 }}>
-                            Max context supported:{' '}
-                            {monitoring.llm.maxContextTokens
-                                ? `${monitoring.llm.maxContextTokens} tokens (declared by the workflow${
-                                      monitoring.llm.model ? ` · ${monitoring.llm.model}` : ''
-                                  })`
-                                : monitoring.llm.reason || 'not declared by the workflow'}
+                    <List dense disablePadding>
+                        {sessions.map((session) => (
+                            <ListItemButton
+                                key={session.id}
+                                selected={session.id === activeSessionId}
+                                onClick={() => onSelectSession(session.id)}
+                                sx={{ borderRadius: 2, alignItems: 'flex-start' }}
+                            >
+                                <ListItemText
+                                    primary={
+                                        <Typography variant='body2' sx={{ fontWeight: session.id === activeSessionId ? 600 : 400 }}>
+                                            {session.title}
+                                        </Typography>
+                                    }
+                                    secondary={
+                                        <Typography variant='caption' color='text.secondary' component='span'>
+                                            {workflowName(session.defaultWorkflowId) || 'no default workflow'} · {session.messageCount} msg
+                                            · {new Date(session.lastActivityAt).toLocaleString()}
+                                            {session.workspaceId
+                                                ? ` · ${workspaces.find((w) => w.id === session.workspaceId)?.name || ''}`
+                                                : ''}
+                                        </Typography>
+                                    }
+                                />
+                                <Stack flexDirection='row' sx={{ gap: 0 }}>
+                                    <Tooltip title='Rename'>
+                                        <IconButton
+                                            size='small'
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                onRenameSession(session)
+                                            }}
+                                        >
+                                            <IconPencil size={14} />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title='Delete'>
+                                        <IconButton
+                                            size='small'
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                onDeleteSession(session)
+                                            }}
+                                        >
+                                            <IconTrash size={14} />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Stack>
+                            </ListItemButton>
+                        ))}
+                    </List>
+                </Box>
+
+                <Divider />
+
+                {/* AI monitoring */}
+                <Box sx={{ p: 1.25, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+                    <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant='subtitle2' sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            AI Monitoring
                         </Typography>
-                    )}
-                    <Gauge label={`CPU (${monitoring?.cpu?.cores ?? '?'} cores)`} value={monitoring?.cpu?.usagePercent} />
-                    <Gauge label='RAM' value={monitoring?.memory?.usedPercent} reason='Memory usage unavailable on this host' />
-                    {monitoring?.memory && (
-                        <Typography variant='caption' color='text.secondary'>
-                            {(monitoring.memory.usedBytes / 1024 ** 3).toFixed(1)} GB /{' '}
-                            {(monitoring.memory.totalBytes / 1024 ** 3).toFixed(1)} GB
-                        </Typography>
-                    )}
-                    <Gauge
-                        label={monitoring?.gpu?.available ? `GPU (${monitoring.gpu.name})` : 'GPU'}
-                        value={monitoring?.gpu?.available ? monitoring.gpu.usagePercent : undefined}
-                        reason={monitoring?.gpu?.reason}
-                    />
-                    <Box>
-                        <Stack flexDirection='row' sx={{ justifyContent: 'space-between' }}>
-                            <Typography variant='caption'>Provider balance</Typography>
+                        {monitoringLoading && <CircularProgress size={12} />}
+                    </Stack>
+                    <Stack sx={{ gap: 1, mt: 1 }}>
+                        <Gauge label='Context usage' value={monitoring?.context?.usedPercent} reason='No active session context' />
+                        {monitoring?.context && (
                             <Typography variant='caption' color='text.secondary'>
-                                {monitoring?.providerBalance?.available
-                                    ? `${monitoring.providerBalance.balance?.toFixed?.(2)} ${monitoring.providerBalance.currency} (${
-                                          monitoring.providerBalance.provider
-                                      })`
-                                    : 'unavailable'}
-                            </Typography>
-                        </Stack>
-                        {!monitoring?.providerBalance?.available && (
-                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block', lineHeight: 1.3 }}>
-                                {monitoring?.providerBalance?.reason || 'No provider balance endpoint configured'}
+                                {monitoring.context.usedMessages} / {monitoring.context.windowMessages} messages of the context window
+                                (session holds {monitoring.context.totalMessages})
                             </Typography>
                         )}
-                    </Box>
-                    {monitoring?.platform && (
-                        <Typography variant='caption' color='text.secondary'>
-                            {monitoring.platform}
-                        </Typography>
-                    )}
-                </Stack>
+                        {monitoring?.llm && (
+                            <Typography variant='caption' color='text.secondary' sx={{ display: 'block', lineHeight: 1.3 }}>
+                                Max context supported:{' '}
+                                {monitoring.llm.maxContextTokens
+                                    ? `${monitoring.llm.maxContextTokens} tokens (declared by the workflow${
+                                          monitoring.llm.model ? ` · ${monitoring.llm.model}` : ''
+                                      })`
+                                    : monitoring.llm.reason || 'not declared by the workflow'}
+                            </Typography>
+                        )}
+                        <Gauge label={`CPU (${monitoring?.cpu?.cores ?? '?'} cores)`} value={monitoring?.cpu?.usagePercent} />
+                        <Gauge label='RAM' value={monitoring?.memory?.usedPercent} reason='Memory usage unavailable on this host' />
+                        {monitoring?.memory && (
+                            <Typography variant='caption' color='text.secondary'>
+                                {(monitoring.memory.usedBytes / 1024 ** 3).toFixed(1)} GB /{' '}
+                                {(monitoring.memory.totalBytes / 1024 ** 3).toFixed(1)} GB
+                            </Typography>
+                        )}
+                        <Box>
+                            <Stack flexDirection='row' sx={{ justifyContent: 'space-between' }}>
+                                <Typography variant='caption'>Provider balance</Typography>
+                                <Typography variant='caption' color='text.secondary'>
+                                    {monitoring?.providerBalance?.available
+                                        ? `${monitoring.providerBalance.balance?.toFixed?.(2)} ${monitoring.providerBalance.currency} (${
+                                              monitoring.providerBalance.provider
+                                          })`
+                                        : 'unavailable'}
+                                </Typography>
+                            </Stack>
+                            {!monitoring?.providerBalance?.available && (
+                                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', lineHeight: 1.3 }}>
+                                    {monitoring?.providerBalance?.reason || 'No provider balance endpoint configured'}
+                                </Typography>
+                            )}
+                        </Box>
+                        {monitoring?.platform && (
+                            <Typography variant='caption' color='text.secondary'>
+                                {monitoring.platform}
+                            </Typography>
+                        )}
+                    </Stack>
+                </Box>
             </Box>
 
             {/* Host directory browser for a new workspace */}

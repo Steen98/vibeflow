@@ -15,6 +15,7 @@ import {
     Tooltip,
     Typography
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 
 // project imports
 import MainCard from '@/ui-component/cards/MainCard'
@@ -25,7 +26,7 @@ import { streamChatBotExecute } from './streaming'
 import vibeflowChatBotApi from '@/api/vibeflowChatBot'
 
 // icons
-import { IconLayoutSidebarRightExpand } from '@tabler/icons-react'
+import { IconArrowDown, IconLayoutSidebarRightExpand, IconStack2 } from '@tabler/icons-react'
 
 const MESSAGE_PAGE_SIZE = 40
 const MONITORING_INTERVAL_MS = 10000
@@ -63,6 +64,7 @@ const VibeFlowChatBot = () => {
     const [monitoring, setMonitoring] = useState(null)
     const [monitoringLoading, setMonitoringLoading] = useState(false)
     const [sidebarOpen, setSidebarOpen] = useState(true)
+    const [atBottom, setAtBottom] = useState(true)
 
     const scrollRef = useRef(null)
     const bottomRef = useRef(null)
@@ -474,11 +476,21 @@ const VibeFlowChatBot = () => {
         setNotice({ severity: 'success', text: 'Transcription added to the input, you can edit it before sending.' })
     }
 
+    const selectedWorkflow = useMemo(
+        () => workflows.find((workflow) => workflow.id === selectedWorkflowId) || null,
+        [workflows, selectedWorkflowId]
+    )
+
     const workflowOptions = useMemo(
         () =>
             workflows.map((workflow) => (
-                <MenuItem key={workflow.id} value={workflow.id}>
-                    {workflow.name} · {workflow.type}
+                <MenuItem key={workflow.id} value={workflow.id} sx={{ gap: 1 }}>
+                    <Typography variant='body2' noWrap sx={{ flex: 1 }}>
+                        {workflow.name}
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary'>
+                        {workflow.type}
+                    </Typography>
                 </MenuItem>
             )),
         [workflows]
@@ -495,14 +507,16 @@ const VibeFlowChatBot = () => {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: 2,
-                            p: 1.5,
+                            px: 2,
+                            py: 1.25,
+                            minHeight: 56,
                             borderBottom: 1,
                             borderColor: 'divider'
                         }}
                     >
                         <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 1, minWidth: 0 }}>
-                            <Typography variant='subtitle1' noWrap>
-                                {activeSession?.title || 'ChatBot'}
+                            <Typography variant='subtitle1' noWrap sx={{ fontWeight: 600 }}>
+                                {activeSession?.title || 'New conversation'}
                             </Typography>
                             {activeSession?.workspaceId && (
                                 <Chip
@@ -511,28 +525,16 @@ const VibeFlowChatBot = () => {
                                     label={workspaces.find((workspace) => workspace.id === activeSession.workspaceId)?.name || 'workspace'}
                                 />
                             )}
-                            {capabilities?.speechToText?.available && (
-                                <Chip size='small' variant='outlined' color='primary' label={`STT: ${capabilities.speechToText.source}`} />
+                            {activeSession && (
+                                <Typography variant='caption' color='text.secondary' noWrap>
+                                    {activeSession.messageCount} message(s)
+                                </Typography>
                             )}
                         </Stack>
-                        <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 1 }}>
-                            <TextField
-                                select
-                                size='small'
-                                label='Workflow'
-                                value={selectedWorkflowId}
-                                onChange={(event) => setSelectedWorkflowId(event.target.value)}
-                                sx={{ minWidth: 240 }}
-                                disabled={workflowsLoading}
-                            >
-                                <MenuItem value=''>
-                                    <em>{workflowsLoading ? 'Loading…' : 'Select a workflow'}</em>
-                                </MenuItem>
-                                {workflowOptions}
-                            </TextField>
+                        <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 0.5 }}>
                             {!sidebarOpen && (
-                                <Tooltip title='Show sidebar'>
-                                    <IconButton onClick={() => setSidebarOpen(true)}>
+                                <Tooltip title='Show sessions and monitoring'>
+                                    <IconButton onClick={() => setSidebarOpen(true)} aria-label='show sessions and monitoring'>
                                         <IconLayoutSidebarRightExpand size={18} />
                                     </IconButton>
                                 </Tooltip>
@@ -540,57 +542,196 @@ const VibeFlowChatBot = () => {
                         </Stack>
                     </Stack>
 
-                    {/* conversation */}
-                    <Box ref={scrollRef} sx={{ flex: 1, overflowY: 'auto', p: 2, minHeight: 0 }}>
-                        {hasMore && (
-                            <Stack sx={{ alignItems: 'center', mb: 1 }}>
-                                <Button size='small' onClick={handleLoadOlder}>
-                                    Load older messages
-                                </Button>
-                            </Stack>
-                        )}
-                        {messagesLoading && messages.length === 0 && <Skeleton variant='rounded' height={120} />}
-                        {!messagesLoading && messages.length === 0 && (
-                            <Stack sx={{ alignItems: 'center', justifyContent: 'center', height: '100%', gap: 1 }}>
-                                <Typography variant='body1'>Select a workflow, then send your first request.</Typography>
-                                <Typography variant='caption' color='text.secondary'>
-                                    The ChatBot executes the workflows that already exist in Flowise.
+                    {/* workflow bar — horizontal, above the conversation and the composer */}
+                    <Box
+                        sx={{
+                            px: 2,
+                            py: 1.25,
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                            bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.08 : 0.04)
+                        }}
+                    >
+                        <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            <Stack flexDirection='row' sx={{ alignItems: 'center', gap: 0.75, color: 'text.secondary' }}>
+                                <IconStack2 size={16} />
+                                <Typography variant='caption' sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                                    Workflow
                                 </Typography>
                             </Stack>
-                        )}
-                        <Stack sx={{ gap: 2 }}>
-                            {messages.map((message) => (
-                                <ConversationMessage
-                                    key={message.id}
-                                    message={message}
-                                    isExecuting={Boolean(sending) && message.role === 'user'}
-                                    onRetry={handleRetry}
-                                    onRetryAsBranch={handleRetryAsBranch}
-                                    onStop={handleStop}
+
+                            <TextField
+                                select
+                                size='small'
+                                value={selectedWorkflowId}
+                                onChange={(event) => setSelectedWorkflowId(event.target.value)}
+                                disabled={workflowsLoading}
+                                inputProps={{ 'aria-label': 'Workflow to execute' }}
+                                sx={{ minWidth: 240, flex: '0 1 380px' }}
+                            >
+                                <MenuItem value=''>
+                                    <em>
+                                        {workflowsLoading
+                                            ? 'Loading workflows…'
+                                            : workflows.length
+                                            ? 'Select a workflow'
+                                            : 'No workflow available yet'}
+                                    </em>
+                                </MenuItem>
+                                {workflowOptions}
+                            </TextField>
+
+                            {selectedWorkflow && <Chip size='small' variant='outlined' label={selectedWorkflow.type} />}
+
+                            <Box sx={{ flex: 1, minWidth: 8 }} />
+
+                            {sending && <Chip size='small' color='primary' label={streamingId ? 'Streaming…' : 'Running…'} />}
+                            {capabilities?.speechToText?.available && (
+                                <Chip size='small' variant='outlined' label={`Voice · ${capabilities.speechToText.source}`} />
+                            )}
+                            {typeof capabilities?.uploads?.maxFileSizeBytes === 'number' && (
+                                <Chip
+                                    size='small'
+                                    variant='outlined'
+                                    label={`Files ≤ ${Math.round(capabilities.uploads.maxFileSizeBytes / (1024 * 1024))} MB`}
                                 />
-                            ))}
+                            )}
                         </Stack>
-                        {sending && (
-                            <Stack sx={{ mt: 2, gap: 1 }}>
-                                <LinearProgress />
-                                <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Typography variant='caption' color='text.secondary'>
-                                        {streamingId ? 'Streaming the workflow answer…' : 'Running the workflow…'}
-                                    </Typography>
-                                    <Button size='small' color='error' onClick={handleStop}>
-                                        Stop
-                                    </Button>
+                        <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 0.75 }}>
+                            {selectedWorkflow
+                                ? `Requests are executed by "${selectedWorkflow.name}" through the real prediction pipeline.`
+                                : 'Choose one of the workflows available in VibeFlow, then write your request below.'}
+                        </Typography>
+                    </Box>
+
+                    {/* conversation */}
+                    <Box role='region' aria-label='Conversation' sx={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
+                        <Box
+                            ref={scrollRef}
+                            onScroll={(event) => {
+                                const element = event.currentTarget
+                                setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 120)
+                            }}
+                            sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}
+                        >
+                            <Box
+                                sx={{
+                                    maxWidth: 920,
+                                    mx: 'auto',
+                                    px: { xs: 2, md: 3 },
+                                    py: 2.5,
+                                    minHeight: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                {hasMore && (
+                                    <Stack sx={{ alignItems: 'center', mb: 1.5 }}>
+                                        <Button size='small' variant='outlined' onClick={handleLoadOlder}>
+                                            Load older messages
+                                        </Button>
+                                    </Stack>
+                                )}
+
+                                {messagesLoading && messages.length === 0 && (
+                                    <Stack sx={{ gap: 2 }}>
+                                        <Skeleton variant='rounded' height={64} />
+                                        <Skeleton variant='rounded' height={110} />
+                                    </Stack>
+                                )}
+
+                                {!messagesLoading && messages.length === 0 && (
+                                    <Stack
+                                        sx={{
+                                            flex: 1,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 1.5,
+                                            py: 6,
+                                            textAlign: 'center'
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                width: 52,
+                                                height: 52,
+                                                borderRadius: '50%',
+                                                display: 'grid',
+                                                placeItems: 'center',
+                                                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                                                color: 'primary.main'
+                                            }}
+                                        >
+                                            <IconStack2 size={24} />
+                                        </Box>
+                                        <Typography variant='h3'>{selectedWorkflow ? 'Ready to run' : 'Start a conversation'}</Typography>
+                                        <Typography variant='body2' color='text.secondary' sx={{ maxWidth: 480 }}>
+                                            {selectedWorkflow
+                                                ? `"${selectedWorkflow.name}" is selected. Write your request below: the answer comes from the workflow itself.`
+                                                : 'Pick a workflow in the bar above, attach a workspace if you need files, then write your first request.'}
+                                        </Typography>
+                                    </Stack>
+                                )}
+
+                                <Stack sx={{ gap: 2.5 }}>
+                                    {messages.map((message) => (
+                                        <ConversationMessage
+                                            key={message.id}
+                                            message={message}
+                                            isExecuting={Boolean(sending) && message.role === 'user'}
+                                            onRetry={handleRetry}
+                                            onRetryAsBranch={handleRetryAsBranch}
+                                            onStop={handleStop}
+                                        />
+                                    ))}
                                 </Stack>
-                            </Stack>
+
+                                {sending && (
+                                    <Box sx={{ mt: 2.5 }}>
+                                        <LinearProgress sx={{ borderRadius: 2 }} />
+                                        <Stack flexDirection='row' sx={{ alignItems: 'center', justifyContent: 'space-between', mt: 0.75 }}>
+                                            <Typography variant='caption' color='text.secondary'>
+                                                {streamingId ? 'Streaming the workflow answer…' : 'Running the workflow…'}
+                                            </Typography>
+                                            <Button size='small' color='error' onClick={handleStop}>
+                                                Stop
+                                            </Button>
+                                        </Stack>
+                                    </Box>
+                                )}
+                                <div ref={bottomRef} />
+                            </Box>
+                        </Box>
+
+                        {!atBottom && messages.length > 0 && (
+                            <Tooltip title='Jump to the latest message'>
+                                <IconButton
+                                    onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                                    aria-label='jump to the latest message'
+                                    sx={{
+                                        position: 'absolute',
+                                        bottom: 16,
+                                        right: 20,
+                                        border: 1,
+                                        borderColor: 'divider',
+                                        bgcolor: 'background.paper',
+                                        boxShadow: 3,
+                                        '&:hover': { bgcolor: 'background.paper' }
+                                    }}
+                                >
+                                    <IconArrowDown size={18} />
+                                </IconButton>
+                            </Tooltip>
                         )}
-                        <div ref={bottomRef} />
                     </Box>
 
                     {notice && (
-                        <Box sx={{ px: 2 }}>
-                            <Alert severity={notice.severity} onClose={() => setNotice(null)} sx={{ mb: 1 }}>
-                                {notice.text}
-                            </Alert>
+                        <Box sx={{ px: { xs: 2, md: 3 }, pt: 1 }}>
+                            <Box sx={{ maxWidth: 920, mx: 'auto' }}>
+                                <Alert severity={notice.severity} onClose={() => setNotice(null)}>
+                                    {notice.text}
+                                </Alert>
+                            </Box>
                         </Box>
                     )}
 

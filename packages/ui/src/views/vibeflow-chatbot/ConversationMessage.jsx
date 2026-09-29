@@ -67,14 +67,14 @@ const ConversationMessage = ({ message, isExecuting, onRetry, onRetryAsBranch, o
                     variant='outlined'
                     sx={{
                         px: 2,
-                        py: 1,
+                        py: 1.25,
                         borderRadius: 2,
                         maxWidth: '85%',
                         borderColor: theme.palette.warning.main,
                         bgcolor: alpha(theme.palette.warning.main, 0.08)
                     }}
                 >
-                    <Typography variant='caption' sx={{ whiteSpace: 'pre-wrap' }}>
+                    <Typography variant='caption' sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                         {message.content}
                     </Typography>
                 </Paper>
@@ -87,16 +87,20 @@ const ConversationMessage = ({ message, isExecuting, onRetry, onRetryAsBranch, o
     const sourceDocuments = Array.isArray(message.metadata?.sourceDocuments) ? message.metadata.sourceDocuments : []
 
     return (
-        <Stack flexDirection='row' sx={{ gap: 1, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-            {!isUser && <Avatar sx={{ width: 30, height: 30, bgcolor: theme.palette.primary.main, fontSize: 12 }}>AI</Avatar>}
-            <Box sx={{ maxWidth: '82%', minWidth: 0 }}>
+        <Stack flexDirection='row' sx={{ gap: 1.25, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            {!isUser && (
+                <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main, fontSize: 12, fontWeight: 600 }}>AI</Avatar>
+            )}
+            <Box sx={{ maxWidth: '85%', minWidth: 0 }}>
                 <Paper
                     variant='outlined'
                     sx={{
-                        px: 1.5,
-                        py: 1,
-                        borderRadius: 2,
-                        bgcolor: isUser ? alpha(theme.palette.primary.main, 0.12) : theme.palette.background.paper
+                        px: 2,
+                        py: 1.5,
+                        borderRadius: 2.5,
+                        fontSize: '0.9375rem',
+                        lineHeight: 1.65,
+                        bgcolor: isUser ? alpha(theme.palette.primary.main, 0.14) : theme.palette.background.paper
                     }}
                 >
                     {isUser ? (
@@ -138,7 +142,14 @@ const ConversationMessage = ({ message, isExecuting, onRetry, onRetryAsBranch, o
 
                 <Stack
                     flexDirection='row'
-                    sx={{ gap: 0.5, mt: 0.5, alignItems: 'center', flexWrap: 'wrap', justifyContent: isUser ? 'flex-end' : 'flex-start' }}
+                    sx={{
+                        gap: 0.5,
+                        mt: 0.75,
+                        px: 0.5,
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        justifyContent: isUser ? 'flex-end' : 'flex-start'
+                    }}
                 >
                     <Typography variant='caption' color='text.secondary'>
                         {message.createdAt ? new Date(message.createdAt).toLocaleString() : ''}
@@ -182,7 +193,7 @@ const ConversationMessage = ({ message, isExecuting, onRetry, onRetryAsBranch, o
                     )}
                 </Stack>
             </Box>
-            {isUser && <Avatar sx={{ width: 30, height: 30, bgcolor: theme.palette.grey[600], fontSize: 12 }}>You</Avatar>}
+            {isUser && <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.grey[600], fontSize: 11, fontWeight: 600 }}>You</Avatar>}
         </Stack>
     )
 }

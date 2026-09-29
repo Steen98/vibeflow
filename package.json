@@ -68,7 +68,9 @@
     "pnpm": {
         "onlyBuiltDependencies": [
             "faiss-node",
-            "sqlite3"
+            "sqlite3",
+            "electron",
+            "electron-builder"
         ],
         "overrides": {
             "prebuild-install": "7.1.3",

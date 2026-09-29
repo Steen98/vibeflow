@@ -175,93 +175,124 @@ const ComposerBar = ({
     const recorderDisabled = !speechToText?.available || transcribing || !sessionId
 
     return (
-        <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
-            {attachments && attachments.length > 0 && (
-                <Stack flexDirection='row' sx={{ gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
-                    {attachments.map((attachment, index) => (
-                        <Chip
-                            key={`${attachment.name}-${index}`}
-                            size='small'
-                            variant='outlined'
-                            label={`${attachment.name} · ${formatSize(attachment.size)}`}
-                            onDelete={() => onAttachmentsChange(attachments.filter((_, position) => position !== index))}
-                            deleteIcon={<IconTrash size={14} />}
-                        />
-                    ))}
-                </Stack>
-            )}
+        <Box sx={{ px: { xs: 2, md: 3 }, pt: 1.5, pb: 1.25, borderTop: 1, borderColor: 'divider' }}>
+            <Box sx={{ maxWidth: 920, mx: 'auto' }}>
+                {attachments && attachments.length > 0 && (
+                    <Stack flexDirection='row' sx={{ gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
+                        {attachments.map((attachment, index) => (
+                            <Chip
+                                key={`${attachment.name}-${index}`}
+                                size='small'
+                                variant='outlined'
+                                label={`${attachment.name} · ${formatSize(attachment.size)}`}
+                                onDelete={() => onAttachmentsChange(attachments.filter((_, position) => position !== index))}
+                                deleteIcon={<IconTrash size={14} />}
+                            />
+                        ))}
+                    </Stack>
+                )}
 
-            {recorderError && (
-                <Typography variant='caption' color='error'>
-                    {recorderError}
-                </Typography>
-            )}
+                {recorderError && (
+                    <Typography variant='caption' color='error'>
+                        {recorderError}
+                    </Typography>
+                )}
 
-            <Stack flexDirection='row' sx={{ gap: 1, alignItems: 'flex-end' }}>
-                <TextField
-                    multiline
-                    maxRows={6}
-                    fullWidth
-                    size='small'
-                    placeholder='Write your request… (Enter to send, Shift+Enter for a new line)'
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault()
-                            onSend()
-                        }
-                    }}
-                    disabled={sending}
-                />
+                <Stack flexDirection='row' sx={{ gap: 1, alignItems: 'flex-end' }}>
+                    <TextField
+                        multiline
+                        minRows={1}
+                        maxRows={10}
+                        fullWidth
+                        size='small'
+                        placeholder={recording ? 'Recording… press the microphone again to stop' : 'Write your request…'}
+                        value={value}
+                        onChange={(event) => onChange(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault()
+                                onSend()
+                            }
+                        }}
+                        disabled={sending}
+                        inputProps={{ 'aria-label': 'Your request' }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
 
-                <input ref={fileInputRef} type='file' multiple hidden onChange={handleFiles} />
-                <Tooltip title='Attachments'>
-                    <span>
-                        <IconButton onClick={() => fileInputRef.current?.click()} disabled={sending} aria-label='add attachments'>
-                            <IconPaperclip size={18} />
-                        </IconButton>
-                    </span>
-                </Tooltip>
-
-                <Tooltip title={speechToText?.available ? 'Record a voice request' : speechToText?.reason || 'Speech-to-text unavailable'}>
-                    <span>
-                        <IconButton
-                            onClick={recording ? stopRecording : startRecording}
-                            disabled={recorderDisabled && !recording}
-                            color={recording ? 'error' : 'default'}
-                            aria-label='record'
-                        >
-                            {transcribing ? <CircularProgress size={16} /> : <IconMicrophone size={18} />}
-                        </IconButton>
-                    </span>
-                </Tooltip>
-
-                {sending ? (
-                    <Tooltip title='Stop'>
-                        <IconButton
-                            color='error'
-                            onClick={onStop}
-                            sx={{ bgcolor: alpha(theme.palette.error.main, 0.12), borderRadius: 2, p: 1.2 }}
-                        >
-                            <IconPlayerStop size={18} />
-                        </IconButton>
-                    </Tooltip>
-                ) : (
-                    <Tooltip title={workflowSelected ? 'Send' : 'Select a workflow first'}>
+                    <input ref={fileInputRef} type='file' multiple hidden onChange={handleFiles} />
+                    <Tooltip title='Attachments'>
                         <span>
                             <IconButton
-                                color='primary'
-                                onClick={onSend}
-                                disabled={!value.trim().length || !workflowSelected}
-                                sx={{ bgcolor: alpha(theme.palette.primary.main, 0.12), borderRadius: 2, p: 1.2 }}
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={sending}
+                                aria-label='add attachments'
+                                sx={{ p: 1.15 }}
                             >
-                                <IconSend size={18} />
+                                <IconPaperclip size={18} />
                             </IconButton>
                         </span>
                     </Tooltip>
-                )}
-            </Stack>
+
+                    <Tooltip
+                        title={speechToText?.available ? 'Record a voice request' : speechToText?.reason || 'Speech-to-text unavailable'}
+                    >
+                        <span>
+                            <IconButton
+                                onClick={recording ? stopRecording : startRecording}
+                                disabled={recorderDisabled && !recording}
+                                color={recording ? 'error' : 'default'}
+                                aria-label={recording ? 'stop recording' : 'record a voice request'}
+                                sx={{ p: 1.15 }}
+                            >
+                                {transcribing ? <CircularProgress size={16} /> : <IconMicrophone size={18} />}
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+
+                    {sending ? (
+                        <Tooltip title='Stop'>
+                            <IconButton
+                                color='error'
+                                onClick={onStop}
+                                sx={{ bgcolor: alpha(theme.palette.error.main, 0.12), borderRadius: 2, p: 1.2 }}
+                            >
+                                <IconPlayerStop size={18} />
+                            </IconButton>
+                        </Tooltip>
+                    ) : (
+                        <Tooltip title={workflowSelected ? 'Send' : 'Select a workflow first'}>
+                            <span>
+                                <IconButton
+                                    color='primary'
+                                    onClick={onSend}
+                                    disabled={!value.trim().length || !workflowSelected}
+                                    sx={{ bgcolor: alpha(theme.palette.primary.main, 0.12), borderRadius: 2, p: 1.2 }}
+                                >
+                                    <IconSend size={18} />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
+                </Stack>
+
+                <Stack
+                    flexDirection='row'
+                    sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 0.75, flexWrap: 'wrap' }}
+                >
+                    <Typography variant='caption' color='text.secondary'>
+                        Enter to send · Shift+Enter for a new line
+                    </Typography>
+                    <Typography variant='caption' color='text.secondary'>
+                        {recording
+                            ? 'Recording…'
+                            : transcribing
+                            ? 'Transcribing…'
+                            : workflowSelected
+                            ? 'Ready to send'
+                            : 'Select a workflow to enable sending'}
+                    </Typography>
+                </Stack>
+            </Box>
         </Box>
     )
 }

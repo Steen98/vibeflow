@@ -1,4 +1,3 @@
-import { execFile } from 'child_process'
 import os from 'os'
 import { buildSessionContext, getSession } from 'flowise-components'
 import { ChatFlow } from '../../database/entities/ChatFlow'
@@ -8,8 +7,8 @@ import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
  * VibeFlow AI monitoring.
  *
  * Only real, measured values are returned. When a metric cannot be measured on the host
- * (no supported GPU tool for instance, or no provider balance endpoint configured), the
- * metric is reported as unavailable with the reason - never with an invented number.
+ * (no provider balance endpoint configured for instance), the metric is reported as
+ * unavailable with the reason - never with an invented number.
  */
 
 export interface ICpuMetric {
@@ -24,16 +23,6 @@ export interface IMemoryMetric {
     totalBytes: number
     freeBytes: number
     usedBytes: number
-}
-
-export interface IGpuMetric {
-    available: boolean
-    name?: string
-    usagePercent?: number
-    memoryUsedPercent?: number
-    memoryUsedBytes?: number
-    memoryTotalBytes?: number
-    reason?: string
 }
 
 export interface IProviderBalanceMetric {
@@ -65,7 +54,6 @@ export interface IMonitoringSnapshot {
     platform: string
     cpu: ICpuMetric
     memory: IMemoryMetric
-    gpu: IGpuMetric
     providerBalance: IProviderBalanceMetric
     context?: IContextMetric
     llm?: ILlmContextMetric
@@ -111,58 +99,6 @@ const getMemoryMetric = (): IMemoryMetric => {
         freeBytes,
         usedBytes,
         usedPercent: totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 1000) / 10 : 0
-    }
-}
-
-const runProbe = (file: string, args: string[], timeoutMs = 2500): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        execFile(file, args, { timeout: timeoutMs, windowsHide: true }, (error, stdout) => {
-            if (error) reject(error)
-            else resolve(stdout)
-        })
-    })
-}
-
-const getGpuMetric = async (): Promise<IGpuMetric> => {
-    // NVIDIA
-    try {
-        const stdout = await runProbe('nvidia-smi', [
-            '--query-gpu=name,utilization.gpu,memory.used,memory.total',
-            '--format=csv,noheader,nounits'
-        ])
-        const line = stdout.trim().split('\n')[0]
-        const [name, utilization, memoryUsed, memoryTotal] = line.split(',').map((part) => part.trim())
-        const usedBytes = Number(memoryUsed) * 1024 * 1024
-        const totalBytes = Number(memoryTotal) * 1024 * 1024
-        return {
-            available: true,
-            name,
-            usagePercent: Number(utilization),
-            memoryUsedBytes: usedBytes,
-            memoryTotalBytes: totalBytes,
-            memoryUsedPercent: totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 1000) / 10 : undefined
-        }
-    } catch {
-        /* no NVIDIA tool available, try AMD below */
-    }
-
-    // AMD
-    try {
-        const stdout = await runProbe('rocm-smi', ['--showuse', '--showmeminfo', 'vram', '--csv'])
-        const line = stdout
-            .trim()
-            .split('\n')
-            .find((row) => row.toLowerCase().includes('card'))
-        if (line) {
-            return { available: true, name: 'AMD GPU (rocm-smi)', usagePercent: undefined, reason: undefined }
-        }
-    } catch {
-        /* ignored */
-    }
-
-    return {
-        available: false,
-        reason: 'No supported GPU probe found on this host (nvidia-smi / rocm-smi). GPU metrics stay unavailable rather than being estimated.'
     }
 }
 
@@ -292,7 +228,7 @@ const getWorkflowModelInfo = async (workflowId?: string): Promise<ILlmContextMet
 }
 
 export const collectMonitoring = async (sessionId?: string): Promise<IMonitoringSnapshot> => {
-    const [cpu, gpu, providerBalance] = await Promise.all([getCpuMetric(), getGpuMetric(), getProviderBalanceMetric()])
+    const [cpu, providerBalance] = await Promise.all([getCpuMetric(), getProviderBalanceMetric()])
     const session = sessionId ? getSession(sessionId) : undefined
     const llm = await getWorkflowModelInfo(session?.defaultWorkflowId)
     return {
@@ -300,7 +236,6 @@ export const collectMonitoring = async (sessionId?: string): Promise<IMonitoring
         platform: `${os.type()} ${os.release()} (${process.platform}/${process.arch})`,
         cpu,
         memory: getMemoryMetric(),
-        gpu,
         providerBalance,
         context: getContextMetric(sessionId),
         llm
