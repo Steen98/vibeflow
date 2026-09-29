@@ -75,7 +75,7 @@ const computeLayout = (nodes) => {
  * Zoom / pan / node selection / relation exploration / entity search / type filters /
  * progressive loading (the whole graph is never loaded at once).
  */
-const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local', onCancel }) => {
+const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local', neo4j, onCancel }) => {
     const [statistics, setStatistics] = useState(null)
     const [subgraph, setSubgraph] = useState({ nodes: [], relations: [], truncated: false })
     const [loading, setLoading] = useState(false)
@@ -93,7 +93,11 @@ const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local'
             setLoading(true)
             setError('')
             try {
-                const response = await vibeflowDocStoreApi.getStoreGraph(documentStoreId, { engine, limit: nextLimit || limit })
+                const response = await vibeflowDocStoreApi.getStoreGraph(documentStoreId, {
+                    engine,
+                    limit: nextLimit || limit,
+                    neo4jConfig: neo4j
+                })
                 const payload = response.data?.data || {}
                 setStatistics(payload.statistics || null)
                 setSubgraph(payload.subgraph || { nodes: [], relations: [], truncated: false })
@@ -103,7 +107,7 @@ const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local'
                 setLoading(false)
             }
         },
-        [documentStoreId, engine, limit]
+        [documentStoreId, engine, limit, neo4j]
     )
 
     useEffect(() => {
@@ -112,14 +116,17 @@ const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local'
             loadGraph(DEFAULT_LIMIT)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [show, documentStoreId, engine])
+    }, [show, documentStoreId, engine, neo4j])
 
     const runSearch = async () => {
         if (!query.trim().length || !documentStoreId) return
         setLoading(true)
         setError('')
         try {
-            const response = await vibeflowDocStoreApi.searchStoreGraph(documentStoreId, query.trim())
+            const response = await vibeflowDocStoreApi.searchStoreGraph(documentStoreId, query.trim(), {
+                engine,
+                neo4jConfig: neo4j
+            })
             const found = response.data?.data || { nodes: [], relations: [] }
             if (!found.nodes.length) {
                 setError(`No entity matches "${query}"`)
@@ -143,7 +150,11 @@ const KnowledgeGraphView = ({ show, documentStoreId, engine = 'graphology-local'
         setLoading(true)
         setError('')
         try {
-            const response = await vibeflowDocStoreApi.traverseStoreGraph(documentStoreId, nodeId, { depth })
+            const response = await vibeflowDocStoreApi.traverseStoreGraph(documentStoreId, nodeId, {
+                depth,
+                engine,
+                neo4jConfig: neo4j
+            })
             const found = response.data?.data || { nodes: [], relations: [] }
             setSubgraph((previous) => {
                 const knownNodes = new Set(previous.nodes.map((node) => node.id))
@@ -360,6 +371,7 @@ KnowledgeGraphView.propTypes = {
     show: PropTypes.bool,
     documentStoreId: PropTypes.string,
     engine: PropTypes.string,
+    neo4j: PropTypes.object,
     onCancel: PropTypes.func
 }
 

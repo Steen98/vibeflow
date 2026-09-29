@@ -15,10 +15,14 @@ router.post('/:storeId/graph/sync', vibeflowDocStoreController.syncStoreGraph)
 
 // Knowledge graph access (visualisation, search, traversal, engines)
 router.get('/table', vibeflowDocStoreController.getEnrichedTable)
+router.get('/components/graphknowledge', vibeflowDocStoreController.getGraphKnowledgeComponents)
 router.get('/graph/engines', vibeflowDocStoreController.getGraphEngines)
 router.post('/graph/engines', vibeflowDocStoreController.getGraphEngines)
 router.get('/:storeId/graph', vibeflowDocStoreController.getStoreGraph)
+router.post('/:storeId/graph', vibeflowDocStoreController.getStoreGraph)
 router.get('/:storeId/graph/search', vibeflowDocStoreController.searchStoreGraph)
+router.post('/:storeId/graph/search', vibeflowDocStoreController.searchStoreGraph)
 router.get('/:storeId/graph/traverse/:nodeId', vibeflowDocStoreController.traverseStoreGraph)
+router.post('/:storeId/graph/traverse/:nodeId', vibeflowDocStoreController.traverseStoreGraph)
 
 export default router

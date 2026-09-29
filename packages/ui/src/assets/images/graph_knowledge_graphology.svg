@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Graphology">
+    <g stroke="#1565c0" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85">
+        <path d="M17 21 L32 15" />
+        <path d="M17 21 L19 42" />
+        <path d="M32 15 L47 27" />
+        <path d="M47 27 L40 49" />
+        <path d="M19 42 L40 49" />
+        <path d="M32 15 L19 42" />
+    </g>
+    <circle cx="17" cy="21" r="7" fill="#1565c0" />
+    <circle cx="32" cy="15" r="5" fill="#2296f3" />
+    <circle cx="47" cy="27" r="6" fill="#4fc3f7" />
+    <circle cx="19" cy="42" r="5" fill="#2296f3" />
+    <circle cx="40" cy="49" r="7" fill="#1565c0" />
+</svg>

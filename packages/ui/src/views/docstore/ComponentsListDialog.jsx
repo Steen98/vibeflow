@@ -13,7 +13,7 @@ import { baseURL } from '@/store/constant'
 import { HIDE_CANVAS_DIALOG, SHOW_CANVAS_DIALOG } from '@/store/actions'
 import useApi from '@/hooks/useApi'
 
-const ComponentsListDialog = ({ show, dialogProps, onCancel, apiCall, onSelected }) => {
+const ComponentsListDialog = ({ show, dialogProps, onCancel, apiCall, onSelected, getIconSrc }) => {
     const portalElement = document.getElementById('portal')
     const customization = useSelector((state) => state.customization)
     const dispatch = useDispatch()
@@ -131,50 +131,79 @@ const ComponentsListDialog = ({ show, dialogProps, onCancel, apiCall, onSelected
                         }
                     }}
                 >
-                    {[...provider].filter(filterFlows).map((loader) => (
-                        <ListItemButton
-                            alignItems='center'
-                            key={loader.name}
-                            onClick={() => onSelected(loader)}
-                            sx={{
-                                border: 1,
-                                borderColor: theme.palette.grey[900] + 25,
-                                borderRadius: 2,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'start',
-                                textAlign: 'left',
-                                gap: 1,
-                                p: 2
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: 50,
-                                    height: 50,
-                                    borderRadius: '50%',
-                                    backgroundColor: 'white',
-                                    flexShrink: 0,
+                    {[...provider].filter(filterFlows).map((loader) => {
+                        const disabled = loader.selectable === false
+                        return (
+                            <ListItemButton
+                                alignItems='center'
+                                key={loader.name}
+                                onClick={() => !disabled && onSelected(loader)}
+                                disabled={disabled}
+                                sx={{
+                                    border: 1,
+                                    borderColor: theme.palette.grey[900] + 25,
+                                    borderRadius: 2,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'start',
+                                    textAlign: 'left',
+                                    gap: 1,
+                                    p: 2,
+                                    opacity: disabled ? 0.55 : 1
                                 }}
                             >
-                                <img
+                                <div
                                     style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        padding: 7,
+                                        width: 50,
+                                        height: 50,
                                         borderRadius: '50%',
-                                        objectFit: 'contain'
+                                        backgroundColor: 'white',
+                                        flexShrink: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
                                     }}
-                                    alt={loader.name}
-                                    src={`${baseURL}/api/v1/node-icon/${loader.name}`}
-                                />
-                            </div>
-                            <Typography>{loader.label}</Typography>
-                        </ListItemButton>
-                    ))}
+                                >
+                                    <img
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            padding: 7,
+                                            borderRadius: '50%',
+                                            objectFit: 'contain'
+                                        }}
+                                        alt={loader.label || loader.name}
+                                        src={getIconSrc ? getIconSrc(loader) : `${baseURL}/api/v1/node-icon/${loader.name}`}
+                                    />
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                    <Typography>{loader.label}</Typography>
+                                    {loader.description && (
+                                        <Typography
+                                            variant='caption'
+                                            color='text.secondary'
+                                            sx={{ display: 'block', lineHeight: 1.4, mt: 0.25 }}
+                                        >
+                                            {loader.description}
+                                        </Typography>
+                                    )}
+                                    {loader.reason && (
+                                        <Typography
+                                            variant='caption'
+                                            sx={{
+                                                display: 'block',
+                                                lineHeight: 1.4,
+                                                mt: 0.25,
+                                                color: disabled ? theme.palette.warning.main : theme.palette.text.secondary
+                                            }}
+                                        >
+                                            {loader.reason}
+                                        </Typography>
+                                    )}
+                                </div>
+                            </ListItemButton>
+                        )
+                    })}
                 </List>
             </DialogContent>
         </Dialog>
@@ -188,7 +217,8 @@ ComponentsListDialog.propTypes = {
     dialogProps: PropTypes.object,
     onCancel: PropTypes.func,
     apiCall: PropTypes.func,
-    onSelected: PropTypes.func
+    onSelected: PropTypes.func,
+    getIconSrc: PropTypes.func
 }
 
 export default ComponentsListDialog

@@ -788,21 +788,48 @@ export class KuzuGraphAdapter implements IGraphKnowledgeAdapter {
 export interface IGraphEngineDescriptor {
     engine: GraphEngine
     label: string
+    description?: string
+    /** local (embedded on the host) or server (external service) */
+    kind?: 'local' | 'server'
+    /** the engine can be picked in the UI (its driver is installed) */
+    selectable?: boolean
+    /** the engine is usable right now with the given configuration */
     available: boolean
     reason?: string
 }
 
+const canLoadModule = (moduleName: string): boolean => {
+    try {
+        require(moduleName)
+        return true
+    } catch {
+        return false
+    }
+}
+
 export const describeGraphEngines = async (neo4jConfig?: INeo4jConfig): Promise<IGraphEngineDescriptor[]> => {
     const descriptors: IGraphEngineDescriptor[] = [
-        { engine: 'graphology-local', label: 'Graphology + JSON persistence (local)', available: true }
+        {
+            engine: 'graphology-local',
+            label: 'Graphology + JSON Persistence (Local)',
+            description: 'Embedded graph persisted as JSON on the host. No server and no extra dependency.',
+            kind: 'local',
+            selectable: true,
+            available: true
+        }
     ]
 
     const neo4jAdapter = new Neo4jGraphAdapter('probe', neo4jConfig || { url: '', username: '', password: '' })
     const neo4jStatus = await neo4jAdapter.isAvailable()
-    descriptors.push({ engine: 'neo4j', label: 'Neo4j (server)', available: neo4jStatus.available, reason: neo4jStatus.reason })
-
-    const kuzuStatus = await new KuzuGraphAdapter('probe').isAvailable()
-    descriptors.push({ engine: 'kuzu', label: 'Kuzu (embedded)', available: kuzuStatus.available, reason: kuzuStatus.reason })
+    descriptors.push({
+        engine: 'neo4j',
+        label: 'Neo4j (Server)',
+        description: 'External Neo4j server reached over Bolt. Needs a reachable instance and its credentials.',
+        kind: 'server',
+        selectable: canLoadModule('neo4j-driver'),
+        available: neo4jStatus.available,
+        reason: neo4jStatus.reason
+    })
 
     return descriptors
 }

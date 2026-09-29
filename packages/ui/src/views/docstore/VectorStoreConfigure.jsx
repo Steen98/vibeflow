@@ -936,6 +936,12 @@ const VectorStoreConfigure = () => {
                                             </Box>
                                         )}
                                     </Grid>
+                                    <Grid item xs={12} sm={4} md={4}>
+                                        <GraphKnowledgeConfig
+                                            documentStoreId={storeId}
+                                            onViewGraph={({ engine, neo4j }) => setGraphViewer({ show: true, engine, neo4j })}
+                                        />
+                                    </Grid>
                                 </Grid>
                             </Stack>
                         )}
@@ -943,12 +949,11 @@ const VectorStoreConfigure = () => {
                 )}
             </MainCard>
 
-            <GraphKnowledgeConfig documentStoreId={storeId} onViewGraph={({ engine }) => setGraphViewer({ show: true, engine })} />
-
             <KnowledgeGraphView
                 show={graphViewer.show}
                 documentStoreId={storeId}
                 engine={graphViewer.engine}
+                neo4j={graphViewer.neo4j}
                 onCancel={() => setGraphViewer({ show: false })}
             />
 

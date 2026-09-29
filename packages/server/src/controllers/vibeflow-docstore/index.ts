@@ -17,15 +17,37 @@ const getGraphEngines = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+const getGraphKnowledgeComponents = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const neo4jConfig = req.body?.neo4jConfig
+        return res.json(await vibeflowDocStoreService.getGraphKnowledgeComponents(neo4jConfig))
+    } catch (error) {
+        next(error)
+    }
+}
+
+/**
+ * Graph reads can be issued as GET (parameters in the query string, for backwards compatibility)
+ * or as POST (parameters in the JSON body). POST is preferred whenever a Neo4j connection is
+ * involved so the credentials never travel in the URL.
+ */
+const bodyOrQuery = (req: Request, key: string): any => {
+    const fromBody = (req.body || {})[key]
+    if (fromBody !== undefined && fromBody !== null && fromBody !== '') return fromBody
+    return req.query?.[key]
+}
+
 const getStoreGraph = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const storeId = requireParam(req.params?.storeId, 'Error: vibeflowDocStoreController.getStoreGraph - storeId not provided!')
+        const depth = bodyOrQuery(req, 'depth')
+        const limit = bodyOrQuery(req, 'limit')
         return res.json(
             await vibeflowDocStoreService.getStoreGraph({
                 storeId,
-                engine: req.query?.engine as any,
-                depth: req.query?.depth ? Number(req.query.depth) : undefined,
-                limit: req.query?.limit ? Number(req.query.limit) : undefined,
+                engine: bodyOrQuery(req, 'engine') as any,
+                depth: depth !== undefined ? Number(depth) : undefined,
+                limit: limit !== undefined ? Number(limit) : undefined,
                 nodeIds: req.body?.nodeIds,
                 neo4jConfig: req.body?.neo4jConfig
             })
@@ -38,12 +60,13 @@ const getStoreGraph = async (req: Request, res: Response, next: NextFunction) =>
 const searchStoreGraph = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const storeId = requireParam(req.params?.storeId, 'Error: vibeflowDocStoreController.searchStoreGraph - storeId not provided!')
+        const limit = bodyOrQuery(req, 'limit')
         return res.json(
             await vibeflowDocStoreService.searchStoreGraph({
                 storeId,
-                query: String(req.query?.query || ''),
-                engine: req.query?.engine as any,
-                limit: req.query?.limit ? Number(req.query.limit) : undefined,
+                query: String(bodyOrQuery(req, 'query') || ''),
+                engine: bodyOrQuery(req, 'engine') as any,
+                limit: limit !== undefined ? Number(limit) : undefined,
                 neo4jConfig: req.body?.neo4jConfig
             })
         )
@@ -56,12 +79,13 @@ const traverseStoreGraph = async (req: Request, res: Response, next: NextFunctio
     try {
         const storeId = requireParam(req.params?.storeId, 'Error: vibeflowDocStoreController.traverseStoreGraph - storeId not provided!')
         const nodeId = requireParam(req.params?.nodeId, 'Error: vibeflowDocStoreController.traverseStoreGraph - nodeId not provided!')
+        const depth = bodyOrQuery(req, 'depth')
         return res.json(
             await vibeflowDocStoreService.traverseStoreGraph({
                 storeId,
                 nodeId,
-                engine: req.query?.engine as any,
-                depth: req.query?.depth ? Number(req.query.depth) : undefined,
+                engine: bodyOrQuery(req, 'engine') as any,
+                depth: depth !== undefined ? Number(depth) : undefined,
                 neo4jConfig: req.body?.neo4jConfig
             })
         )
@@ -186,6 +210,7 @@ export default {
     cancelPipelineJob,
     getEnrichedTable,
     getGraphEngines,
+    getGraphKnowledgeComponents,
     getPipelineJob,
     getPipelinePaths,
     getStoreGraph,

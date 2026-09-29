@@ -656,6 +656,24 @@ export const getGraphEngines = async (neo4jConfig?: INeo4jConfig) => {
     return { data: await describeGraphEngines(neo4jConfig) }
 }
 
+/**
+ * Engines offered by the "Graph Knowledge" block of a Document Store, in the exact shape used by
+ * the other component pickers (`/document-store/components/*`): the UI lists them as rectangular
+ * blocks with a logo and a name, then configures the selected one.
+ */
+export const getGraphKnowledgeComponents = async (neo4jConfig?: INeo4jConfig) => {
+    const engines = await describeGraphEngines(neo4jConfig)
+    return engines.map((engine) => ({
+        name: engine.engine,
+        label: engine.label,
+        description: engine.description,
+        kind: engine.kind,
+        selectable: engine.selectable !== false,
+        available: engine.available,
+        reason: engine.reason
+    }))
+}
+
 export const getStoreGraph = async (params: {
     storeId: string
     engine?: GraphEngine
@@ -914,6 +932,7 @@ export default {
     documentsToPages,
     getEnrichedTable,
     getGraphEngines,
+    getGraphKnowledgeComponents,
     getJob,
     getStoreGraph,
     getStoreGraphPaths,
