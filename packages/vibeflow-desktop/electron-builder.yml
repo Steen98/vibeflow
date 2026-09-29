@@ -6,18 +6,17 @@ directories:
     output: dist
     buildResources: build
 
-# The desktop shell starts the Flowise-compatible server from the repository, so the repository
-# itself (or the extracted application directory) is shipped as extra resources.
+# The desktop packages ship a self-contained copy of the server (production dependencies from
+# `pnpm deploy` plus the prebuilt UI), so the installed application needs no repository.
+# Produce it first with:
+#   pnpm --filter "./packages/server" deploy --prod --legacy .agnes/work/portable/server
+#   (then copy packages/ui/build into .agnes/work/portable/server/node_modules/flowise-ui/build)
 files:
     - main.js
     - package.json
 extraResources:
-    - from: ../../packages/server
+    - from: ../../.agnes/work/portable/server
       to: server
-      filter:
-          - '**/*'
-          - '!**/*.map'
-          - '!**/node_modules/**'
 
 win:
     target:

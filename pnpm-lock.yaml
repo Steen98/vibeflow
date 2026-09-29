@@ -1069,9 +1069,6 @@ importers:
       flowise-nim-container-manager:
         specifier: ^1.0.11
         version: 1.0.11
-      flowise-ui:
-        specifier: workspace:^
-        version: link:../ui
       geoip-lite:
         specifier: ^1.4.10
         version: 1.4.10
@@ -1265,6 +1262,9 @@ importers:
       cypress:
         specifier: ^13.13.0
         version: 13.13.0
+      flowise-ui:
+        specifier: workspace:^
+        version: link:../ui
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@24.13.2)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.4.6(@swc/helpers@0.5.23))(@types/node@24.13.2)(typescript@5.5.2))

@@ -8,17 +8,21 @@ const net = require('net')
 /**
  * VibeFlow desktop shell.
  *
- * The Flowise-compatible server is started as a child process from the VibeFlow repository
- * (packages/server), then the UI is loaded from it. The monorepo is deliberately not bundled:
- * it keeps using the same database, storage and .env configuration as the web version.
+ * The server is started as a child process and the UI is loaded from it. Two launch modes exist:
  *
- * Because of that, the installed application must be able to locate the repository. The lookup
- * order is:
- *   1. the VIBEFLOW_REPO_ROOT environment variable;
- *   2. a `vibeflow-repo-path.txt` file in the Electron userData directory (one line: the path);
- *   3. a `vibeflow-repo` folder next to the executable, or in the packaged resources directory;
- *   4. walking up from the executable, then from this file, looking for packages/server/package.json;
- *   5. in development, the parent of this package.
+ *   1. bundled (installed and portable packages): a self-contained copy of the server — production
+ *      dependencies produced by `pnpm deploy`, plus the prebuilt UI — ships inside the application
+ *      resources (`resources/server`). It is started with the Electron binary itself acting as Node
+ *      (ELECTRON_RUN_AS_NODE), so neither a system Node.js nor pnpm is required, and no repository is
+ *      needed. It keeps using the same database, storage and .env configuration as the web version.
+ *
+ *   2. repository (development): when that bundle is absent, the repository is located and used with
+ *      `pnpm start`. The lookup order is:
+ *      a. the VIBEFLOW_REPO_ROOT environment variable;
+ *      b. a `vibeflow-repo-path.txt` file in the Electron userData directory (one line: the path);
+ *      c. a `vibeflow-repo` folder next to the executable, or in the packaged resources directory;
+ *      d. walking up from the executable, then from this file, looking for packages/server/package.json;
+ *      e. in development, the parent of this package.
  */
 
 const DEFAULT_PORT = process.env.VIBEFLOW_DESKTOP_PORT ? Number(process.env.VIBEFLOW_DESKTOP_PORT) : 3000
@@ -124,11 +128,46 @@ const searchRepoRoot = () => {
     return { repoRoot: null, searched }
 }
 
+/**
+ * The desktop packages ship a self-contained copy of the server (production dependencies produced by
+ * `pnpm deploy`) in extraResources, so no repository is needed. When that folder is present the server
+ * runs from it with the Electron binary itself acting as Node (ELECTRON_RUN_AS_NODE), which avoids
+ * requiring a system Node.js or pnpm installation.
+ */
+const findBundledServer = () => {
+    const searched = []
+    if (!app.isPackaged) return { serverDir: null, searched }
+    const candidates = [path.join(process.resourcesPath, 'server'), path.join(path.dirname(process.execPath), 'resources', 'server')]
+    for (const candidate of candidates) {
+        searched.push(`bundled server: ${candidate}`)
+        const entry = path.join(candidate, REPO_SERVER_ENTRY)
+        const launcher = path.join(candidate, 'bin', 'run')
+        if (fs.existsSync(entry) && fs.existsSync(launcher) && fs.existsSync(path.join(candidate, 'node_modules'))) {
+            return { serverDir: candidate, command: process.execPath, args: [launcher, 'start'], searched }
+        }
+    }
+    return { serverDir: null, searched }
+}
+
 const resolveServerCommand = () => {
+    const bundled = findBundledServer()
+    if (bundled.serverDir) {
+        return {
+            repoRoot: bundled.serverDir,
+            serverDir: bundled.serverDir,
+            command: bundled.command,
+            args: bundled.args,
+            electronAsNode: true,
+            searched: bundled.searched,
+            mode: 'bundled'
+        }
+    }
+
     const { repoRoot, searched } = searchRepoRoot()
+    const allSearched = [...bundled.searched, ...searched]
     if (!repoRoot) {
-        const error = new Error('The VibeFlow repository could not be located.')
-        error.searched = searched
+        const error = new Error('The VibeFlow server could not be located.')
+        error.searched = allSearched
         throw error
     }
     const serverDir = path.join(repoRoot, 'packages', 'server')
@@ -137,15 +176,15 @@ const resolveServerCommand = () => {
             `The VibeFlow repository at "${repoRoot}" is not built or its dependencies are missing.\n\n` +
                 'Run "pnpm install" then "pnpm build" at the repository root, then start VibeFlow again.'
         )
-        error.searched = searched
+        error.searched = allSearched
         throw error
     }
     const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-    return { repoRoot, serverDir, command: pnpm, args: ['start'], searched }
+    return { repoRoot, serverDir, command: pnpm, args: ['start'], searched: allSearched, mode: 'repository' }
 }
 
 const startServer = async (port) => {
-    const { repoRoot, command, args } = resolveServerCommand()
+    const { repoRoot, command, args, electronAsNode } = resolveServerCommand()
     const logDir = path.join(app.getPath('userData'), 'logs')
     fs.mkdirSync(logDir, { recursive: true })
     const logPath = path.join(logDir, 'vibeflow-server.log')
@@ -154,8 +193,13 @@ const startServer = async (port) => {
 
     serverProcess = spawn(command, args, {
         cwd: repoRoot,
-        env: { ...process.env, PORT: String(port), VIBEFLOW_DESKTOP: 'true' },
-        shell: process.platform === 'win32',
+        env: {
+            ...process.env,
+            PORT: String(port),
+            VIBEFLOW_DESKTOP: 'true',
+            ...(electronAsNode ? { ELECTRON_RUN_AS_NODE: '1' } : {})
+        },
+        shell: electronAsNode ? false : process.platform === 'win32',
         windowsHide: true
     })
 
