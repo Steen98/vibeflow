@@ -304,9 +304,6 @@ Flowise supports different environment variables to configure your instance. You
 
 Feel free to ask any questions, raise problems, and request new features.
 
-
-[![Star History Chart](https://api.star-history.com/svg?repos=FlowiseAI/Flowise&type=Timeline)](https://star-history.com/#FlowiseAI/Flowise&Date)
-
 ## 📄 License
 
 Source code in this repository is made available under the [Apache License Version 2.0](LICENSE.md).
